@@ -1,10 +1,16 @@
 // api/coach.js
 export default async function handler(req, res) {
-  // ---- CORS (allow ottiya + www) ----
-  const allowed = new Set(["https://ottiya.com", "https://www.ottiya.com"]);
+  const allowed = new Set([
+    "https://ottiya.com",
+    "https://www.ottiya.com",
+    // dev / preview (optional, remove later)
+    "http://localhost:3000",
+    "http://localhost:5173",
+  ]);
+
   const origin = req.headers.origin;
 
-  if (allowed.has(origin)) {
+  if (origin && allowed.has(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
   }
@@ -12,20 +18,22 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-  // Preflight
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
+  let body = {};
   try {
-    // Vercel sometimes gives req.body as string depending on runtime/settings
-    const body =
-      typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
+    body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
+  } catch (e) {
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
 
+  try {
     const pauseId = (body.pauseId || "").trim();
     const choice = (body.choice || "").trim();
     const profile = body.profile || {};
     const childName = (profile.name || "").trim();
-    const interest = (profile.interest || "").trim(); // "puppies" | "dinos" | "planes" | ""
+    const interest = (profile.interest || "").trim();
 
     if (!pauseId) return res.status(400).json({ error: "Missing pauseId" });
 
@@ -34,9 +42,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY on server" });
     }
 
-    // ---- Expected answers (REN
-
-UMBERED p1..p5) ----
+    // ---- Expected answers (RENUMBERED p1..p5) ----
     const expectedMap = {
       p1: { correct: "한국어", label: "how to say Korean language in Korean" },
       p2: { correct: "선생님", label: "how to say teacher in Korean" },
@@ -46,16 +52,14 @@ UMBERED p1..p5) ----
     };
 
     const expected = expectedMap[pauseId];
-    if (!expected) return res.status(400).json({ error: "Unknown pauseId" });
+    if (!expected) return res.status(400).json({ error: "Unknown pauseId", pauseId });
 
-    // ---- Deterministic correctness ----
     const isUnsure =
       /not sure|don't know|dont know|i forgot|forgot|tried/i.test(choice) ||
       choice.length === 0;
 
     const isCorrect = !isUnsure && choice === expected.correct;
 
-    // ---- Small personalization line (optional) ----
     const interestLine = (() => {
       if (!interest) return "";
       const map = {
@@ -68,7 +72,6 @@ UMBERED p1..p5) ----
 
     const nameLine = childName ? `${childName}, ` : "";
 
-    // ---- Prompt ----
     const system = `
 You are Dr. Coli, a friendly broccoli teacher for children ages 6–8.
 You teach Korean using short, warm English explanations.
@@ -102,7 +105,6 @@ End with exactly: "Let’s keep going!"
 Return plain text only.
 `;
 
-    // ---- Call OpenAI Responses API (the one that worked for you) ----
     const r = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -125,9 +127,7 @@ Return plain text only.
 
     const data = await r.json();
 
-    // ---- Robust text extraction (keeps your old reliability) ----
     let replyText = "";
-
     if (typeof data.output_text === "string" && data.output_text.trim()) {
       replyText = data.output_text.trim();
     }
@@ -148,7 +148,6 @@ Return plain text only.
       replyText = `Nice try! The right answer is ${expected.correct}. Let’s keep going!`;
     }
 
-    // Safety: remove accidental exact duplication (rare, but helps)
     replyText = replyText.replace(/\s+/g, " ").trim();
     const doubled = replyText.match(/^(.+)\s+\1$/);
     if (doubled && doubled[1]) replyText = doubled[1].trim();
