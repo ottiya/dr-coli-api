@@ -26,7 +26,7 @@ if (allowed.has(origin)) {
       },
       body: JSON.stringify({
         model: "gpt-4o-mini-tts",
-        voice: "nova",
+        voice: "shimmer",
         input: text,
         format: "mp3"
       })
