@@ -3,14 +3,33 @@ import OpenAI from "openai";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+const ALLOWED_ORIGINS = new Set([
+  "https://ottiya.com",
+  "https://www.ottiya.com",
+]);
+
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
 function safeTrim(s) {
   return String(s || "").trim();
 }
 
 function dedupeRepeat(text) {
   const t = safeTrim(text).replace(/\s+/g, " ");
+
+  // Case 1: exact duplication: "A A"
   const m = t.match(/^(.+)\s+\1$/);
   if (m && m[1]) return m[1].trim();
+
+  // Case 2: "A...A..." sometimes comes doubled as two halves
   if (t.length > 40 && t.length % 2 === 0) {
     const half = t.length / 2;
     const a = t.slice(0, half).trim();
@@ -22,30 +41,14 @@ function dedupeRepeat(text) {
 
 // Define each pause: correct answer + tiny explanation
 const PAUSES = {
-  p00: {
-    correct: "한국어",
-    brief: `“한국어” means the Korean language.`,
-  },
-  p0: {
-    correct: "선생님",
-    brief: `“선생님” means “teacher”.`,
-  },
-  p1: {
-    correct: "안녕하세요",
-    brief: `“안녕하세요” (annyeonghaseyo) is a polite “hello”.`,
-  },
-  p2: {
-    correct: "안녕하세요 with a bow",
-    brief: `We bow a little to show respect when we say “안녕하세요”.`,
-  },
-  p3: {
-    correct: "안녕",
-    brief: `“안녕” is a friendly “hi” for friends.`,
-  },
+  p00: { correct: "한국어", brief: `“한국어” means the Korean language.` },
+  p0: { correct: "선생님", brief: `“선생님” means “teacher”.` },
+  p1: { correct: "안녕하세요", brief: `“안녕하세요” (annyeonghaseyo) is a polite “hello”.` },
+  p2: { correct: "안녕하세요 with a bow", brief: `We bow a little to show respect when we say “안녕하세요”.` },
+  p3: { correct: "안녕", brief: `“안녕” is a friendly “hi” for friends.` },
 };
 
 function interestLine(interestKey, pauseId) {
-  // Keep it short and kid-friendly
   const map = {
     puppies: {
       p00: "Let’s say it like a puppy trainer learning Korean!",
@@ -74,6 +77,14 @@ function interestLine(interestKey, pauseId) {
 
 export default async function handler(req, res) {
   try {
+    // ✅ CORS first (must happen before any return)
+    applyCors(req, res);
+
+    // ✅ Preflight support (fixes your “blocked by CORS policy” error)
+    if (req.method === "OPTIONS") {
+      return res.status(204).end();
+    }
+
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Use POST" });
     }
@@ -90,7 +101,6 @@ export default async function handler(req, res) {
 
     const spec = PAUSES[pId];
     if (!spec) {
-      // This is the most likely reason you're seeing API error right now
       return res.status(400).json({
         error: "Unknown pauseId",
         details: `pauseId "${pId}" not configured on server`,
@@ -101,31 +111,37 @@ export default async function handler(req, res) {
     const isCorrect = picked === correct;
     const nameBit = name ? `${name}, ` : "";
 
-    // Create a compact “instruction” for OpenAI to write the coaching response
-    // We keep correctness deterministic, and let OpenAI handle tone/phrasing.
     const scenario = interestLine(interest, pId);
-    const scenarioBit = scenario ? ` Add this playful line at the end: "${scenario}"` : "";
+    const scenarioBit = scenario
+      ? `Add this playful line at the end: ${scenario}`
+      : "";
 
     const system = `
 You are Dr. Coli, a friendly broccoli teacher for kids ages 6–8 whose first language is English.
 Write SHORT feedback (1–3 sentences). Be warm and encouraging.
 If incorrect, gently say the correct answer and a tiny explanation. If correct, praise and reinforce meaning.
-Do NOT repeat yourself. Do NOT output quotation marks around the whole response.
+Do NOT repeat yourself. Do NOT include the same sentence twice.
+Do NOT wrap the whole response in quotation marks.
 `.trim();
 
     const user = `
-Lesson checkpoint: ${pId}
-Child answered: "${picked}"
-Correct answer: "${correct}"
-Rule: If incorrect → "Nice try" + correct answer + brief explanation. If correct → praise + brief explanation.
-Use child's name if provided: "${name}"
-Brief explanation: "${spec.brief}"
+Checkpoint: ${pId}
+Child answered: ${picked}
+Correct answer: ${correct}
+
+Rules:
+- If incorrect → "Nice try" + give correct answer + brief explanation.
+- If correct → praise + brief explanation.
+- Use the child's name if provided.
+
+Name: ${name || "(none)"}
+Brief explanation: ${spec.brief}
 ${scenarioBit}
 `.trim();
 
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.5,
+      temperature: 0.4,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -135,13 +151,16 @@ ${scenarioBit}
     let replyText = completion.choices?.[0]?.message?.content || "";
     replyText = dedupeRepeat(replyText);
 
-    // Extra safety: ensure we use name prefix only once if the model forgot
-    if (nameBit && !replyText.startsWith(nameBit) && Math.random() < 0.4) {
-      // optional subtle personalization (not always)
+    // Optional subtle name prefix (not always)
+    if (nameBit && !replyText.startsWith(nameBit) && Math.random() < 0.35) {
       replyText = `${nameBit}${replyText}`;
     }
 
-    return res.status(200).json({ replyText, isCorrect, correctAnswer: correct });
+    return res.status(200).json({
+      replyText,
+      isCorrect,
+      correctAnswer: correct,
+    });
   } catch (err) {
     console.error("coach error:", err);
     return res.status(500).json({
