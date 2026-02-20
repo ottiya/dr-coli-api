@@ -12,11 +12,18 @@ function cacheGet(key) {
 }
 function cacheSet(key, value) {
   if (CACHE.size >= CACHE_MAX) {
-    // delete oldest entry
     const firstKey = CACHE.keys().next().value;
     if (firstKey) CACHE.delete(firstKey);
   }
   CACHE.set(key, value);
+}
+
+// Normalize STT quirks (spaces, punctuation, fullwidth punctuation)
+function norm(s) {
+  return String(s || "")
+    .replace(/\s+/g, "")              // remove spaces: "안 녕 하 세 요" -> "안녕하세요"
+    .replace(/[.?!,，。！？]/g, "")     // remove punctuation
+    .trim();
 }
 
 export default async function handler(req, res) {
@@ -45,7 +52,11 @@ export default async function handler(req, res) {
 
   try {
     const pauseId = (body.pauseId || "").trim();
-    const choice = (body.choice || "").trim();
+
+    // Keep both: raw for display/unsure detection, normalized for matching
+    const choiceRaw = String(body.choice || "").trim();
+    const choiceNorm = norm(choiceRaw);
+
     const profile = body.profile || {};
     const childName = (profile.name || "").trim();
     const interest = (profile.interest || "").trim();
@@ -69,12 +80,15 @@ export default async function handler(req, res) {
     const expected = expectedMap[pauseId];
     if (!expected) return res.status(400).json({ error: "Unknown pauseId", pauseId });
 
+    // Normalize expected too (important for STT punctuation/spacing)
+    const expectedNorm = norm(expected.correct);
+
     // ---- Deterministic correctness ----
     const isUnsure =
-      /not sure|don't know|dont know|i forgot|forgot|tried/i.test(choice) ||
-      choice.length === 0;
+      /not sure|don't know|dont know|i forgot|forgot|tried/i.test(choiceRaw) ||
+      choiceRaw.length === 0;
 
-    const isCorrect = !isUnsure && choice === expected.correct;
+    const isCorrect = !isUnsure && choiceNorm === expectedNorm;
 
     // ---- Optional personalization line ----
     const interestLine = (() => {
@@ -89,11 +103,11 @@ export default async function handler(req, res) {
 
     const namePrefix = childName ? `${childName}, ` : "";
 
-    // ---- Cache key (still uses OpenAI; just avoids repeats during demo) ----
-    // Keep key stable & small
+    // ---- Cache key (avoid repeats during demo) ----
+    // Use normalized choice so "안녕하세요!" and "안녕하세요" share cache
     const cacheKey = JSON.stringify({
       p: pauseId,
-      c: choice,
+      c: choiceNorm,
       n: childName ? 1 : 0,
       i: interest || "",
       ok: isCorrect ? 1 : 0,
@@ -104,7 +118,15 @@ export default async function handler(req, res) {
     if (cached) {
       return res.status(200).json({
         replyText: cached,
-        debug: { pauseId, choice, isCorrect, isUnsure, cached: true },
+        debug: {
+          pauseId,
+          choiceRaw,
+          choiceNorm,
+          expected: expected.correct,
+          isCorrect,
+          isUnsure,
+          cached: true,
+        },
       });
     }
 
@@ -117,7 +139,8 @@ export default async function handler(req, res) {
 
     const user =
       `Pause ${pauseId}. Goal: ${expected.label}. Correct: ${expected.correct}. ` +
-      `Child tapped: "${choice}". isCorrect=${isCorrect}. isUnsure=${isUnsure}. ` +
+      `Child said/tapped: "${choiceRaw}". (Normalized: "${choiceNorm}") ` +
+      `isCorrect=${isCorrect}. isUnsure=${isUnsure}. ` +
       (childName ? `Name: ${childName}. ` : "") +
       (interestLine ? `Theme word: ${interestLine}. ` : "") +
       `Rules: If correct, praise + confirm. If unsure, encourage + give correct phrase. ` +
@@ -134,8 +157,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        // Shorter output = lower latency
-        max_output_tokens: 70,
+        max_output_tokens: 70, // shorter output = lower latency
         temperature: 0.4,
         input: [
           { role: "system", content: system },
@@ -190,7 +212,15 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       replyText,
-      debug: { pauseId, choice, isCorrect, isUnsure, cached: false },
+      debug: {
+        pauseId,
+        choiceRaw,
+        choiceNorm,
+        expected: expected.correct,
+        isCorrect,
+        isUnsure,
+        cached: false,
+      },
     });
   } catch (e) {
     return res
