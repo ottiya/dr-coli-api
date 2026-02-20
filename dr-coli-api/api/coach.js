@@ -88,7 +88,7 @@ export default async function handler(req, res) {
       p1: { correct: "한국어", label: "say 'Korean language' in Korean" },
       p2: { correct: "선생님", label: "say 'teacher' in Korean" },
       p3: { correct: "안녕하세요", label: "polite hello" },
-      p4: { correct: "안녕하세요 with a bow", label: "say 안녕하세요 with respect (a bow)" },
+      p4: { correct: "안녕하세요", label: "say 안녕하세요 with respect (a bow)" },
       p5: { correct: "안녕", label: "hello to friends" },
     };
 
