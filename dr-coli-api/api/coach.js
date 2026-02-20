@@ -21,9 +21,24 @@ function cacheSet(key, value) {
 // Normalize STT quirks (spaces, punctuation, fullwidth punctuation)
 function norm(s) {
   return String(s || "")
-    .replace(/\s+/g, "")              // "안 녕 하 세 요" -> "안녕하세요"
+    .replace(/\s+/g, "")              // remove spaces: "안 녕 하 세 요" -> "안녕하세요"
     .replace(/[.?!,，。！？]/g, "")     // remove punctuation
     .trim();
+}
+
+// If the model ever adds a trailing question (or another prompt), strip it when correct.
+// (We keep "Let’s keep going!" because your UI/flow expects it.)
+function stripTrailingQuestions(text) {
+  let t = String(text || "").trim();
+
+  // While the reply ends with a question, remove the last sentence-ish chunk.
+  while (/\?\s*$/.test(t)) {
+    const idx = Math.max(t.lastIndexOf(". "), t.lastIndexOf("! "), t.lastIndexOf("? "));
+    if (idx === -1) return "";
+    t = t.slice(0, idx + 1).trim();
+  }
+
+  return t;
 }
 
 export default async function handler(req, res) {
@@ -42,7 +57,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
-  // Parse body safely (handles string body too)
+  // Parse body safely
   let body = {};
   try {
     body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
@@ -68,7 +83,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY on server" });
     }
 
-    // ---- Expected answers (p1..p5) ----
+    // ---- Expected answers (RENUMBERED p1..p5) ----
     const expectedMap = {
       p1: { correct: "한국어", label: "say 'Korean language' in Korean" },
       p2: { correct: "선생님", label: "say 'teacher' in Korean" },
@@ -104,6 +119,7 @@ export default async function handler(req, res) {
     const namePrefix = childName ? `${childName}, ` : "";
 
     // ---- Cache key (avoid repeats during demo) ----
+    // Use normalized choice so "안녕하세요!" and "안녕하세요" share cache
     const cacheKey = JSON.stringify({
       p: pauseId,
       c: choiceNorm,
@@ -129,24 +145,32 @@ export default async function handler(req, res) {
       });
     }
 
-    // ---- Prompt (playful, still short + consistent ending) ----
+    // ---- Smaller prompt = faster ----
+    // ✅ Key changes:
+    //  - If correct: MUST NOT ask a question or introduce a new prompt/scenario.
+    //  - If not correct: MUST end with a short question inviting the child to try again.
+    //  - Always end with "Let’s keep going!" (your UI expects it).
     const system =
       "You are Dr. Coli, a friendly broccoli teacher for kids 6–8. " +
-      "Respond in warm, playful, simple English. 1–2 sentences (max 3). " +
+      "Respond in warm, simple English. 1–2 sentences (max 3). " +
       "Never mention AI or tech. Do not repeat yourself. " +
-      "On correct answers, you may add one tiny celebration like 'Woohoo!' (max 2 words). " +
+      "If isCorrect=true: DO NOT ask any question and do NOT introduce a new prompt. " +
+      "If isCorrect=false: You MAY end with one short question inviting the child to try again. " +
       'End with exactly: "Let’s keep going!"';
 
+    // ✅ Tell the model what *exact structure* to use.
     const user =
       `Pause ${pauseId}. Goal: ${expected.label}. Correct: ${expected.correct}. ` +
       `Child said/tapped: "${choiceRaw}". (Normalized: "${choiceNorm}") ` +
       `isCorrect=${isCorrect}. isUnsure=${isUnsure}. ` +
       (childName ? `Name: ${childName}. ` : "") +
       (interestLine ? `Theme word: ${interestLine}. ` : "") +
-      `Rules: If correct, praise + confirm. If unsure, encourage + give correct phrase. ` +
-      `If wrong, say "Nice try!" + give correct phrase + one tiny hint. ` +
-      `If you use the name, start with "${namePrefix}" (don’t overuse). ` +
-      (interestLine ? `Include "${interestLine}" as a very short sentence before the ending. ` : "") +
+      `Rules:\n` +
+      `- If correct: praise + confirm meaning. NO question. NO new scenario. Stop after encouragement.\n` +
+      `- If unsure: encourage + give correct phrase + meaning.\n` +
+      `- If wrong: say "Nice try!" + give correct phrase + meaning + one tiny hint.\n` +
+      `- If you use the name, start with "${namePrefix}" (don’t overuse).\n` +
+      (interestLine ? `- Include "${interestLine}" as a very short sentence before the ending.\n` : "") +
       `Return plain text only.`;
 
     const r = await fetch("https://api.openai.com/v1/responses", {
@@ -157,8 +181,8 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        max_output_tokens: 75,
-        temperature: 0.5,
+        max_output_tokens: 70, // shorter output = lower latency
+        temperature: 0.35,
         input: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -192,15 +216,32 @@ export default async function handler(req, res) {
     }
 
     if (!replyText) {
-      replyText = `Nice try! The right answer is ${expected.correct}. Let’s keep going!`;
+      // fallback (still follows “no question when correct”)
+      replyText = isCorrect
+        ? `You got it! "${expected.correct}" is correct. Let’s keep going!`
+        : `Nice try! The right answer is ${expected.correct}. Want to try it again? Let’s keep going!`;
     }
 
     // Normalize whitespace
     replyText = replyText.replace(/\s+/g, " ").trim();
 
+    // ✅ If correct, forcibly remove any trailing question that slipped through.
+    if (isCorrect) {
+      const cleaned = stripTrailingQuestions(replyText);
+      if (cleaned) replyText = cleaned;
+    }
+
     // Enforce ending for consistency
     if (!replyText.endsWith("Let’s keep going!")) {
       replyText = replyText.replace(/[.!?]*\s*$/, "").trim() + ". Let’s keep going!";
+    }
+
+    // ✅ After enforcing ending, re-check: if correct, still no question before the ending.
+    if (isCorrect && /\?\s*Let’s keep going!\s*$/.test(replyText)) {
+      // Remove the question sentence right before the ending.
+      const beforeEnding = replyText.replace(/\s*Let’s keep going!\s*$/, "").trim();
+      const cleaned = stripTrailingQuestions(beforeEnding);
+      replyText = (cleaned || beforeEnding).replace(/[.!?]*\s*$/, "").trim() + ". Let’s keep going!";
     }
 
     // Remove rare exact duplication
