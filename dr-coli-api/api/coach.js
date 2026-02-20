@@ -31,7 +31,6 @@ function norm(s) {
 function stripTrailingQuestions(text) {
   let t = String(text || "").trim();
 
-  // While the reply ends with a question, remove the last sentence-ish chunk.
   while (/\?\s*$/.test(t)) {
     const idx = Math.max(t.lastIndexOf(". "), t.lastIndexOf("! "), t.lastIndexOf("? "));
     if (idx === -1) return "";
@@ -39,6 +38,36 @@ function stripTrailingQuestions(text) {
   }
 
   return t;
+}
+
+// Fallback playful theme line if front-end didn't send flavorByPause
+function fallbackFlavorLine(interest, pauseId) {
+  const map = {
+    puppies: {
+      p1: "Puppy mission time!",
+      p2: "Uh-oh! A puppy teacher is here!",
+      p3: "A puppy friend says hi!",
+      p4: "This puppy judge likes polite bows!",
+      p5: "Say hi to your puppy buddy!"
+    },
+    dinos: {
+      p1: "Welcome to the dino museum!",
+      p2: "Roar! The dino teacher is here!",
+      p3: "A museum friend says hi!",
+      p4: "This dino scientist likes polite bows!",
+      p5: "Say hi to your dino buddy!"
+    },
+    planes: {
+      p1: "Airport adventure time!",
+      p2: "Captain teacher is here!",
+      p3: "A pilot says hi!",
+      p4: "The captain likes polite bows!",
+      p5: "Say hi to your airplane toy!"
+    }
+  };
+
+  const byInterest = map[interest];
+  return byInterest?.[pauseId] || "";
 }
 
 export default async function handler(req, res) {
@@ -76,12 +105,15 @@ export default async function handler(req, res) {
     const childName = (profile.name || "").trim();
     const interest = (profile.interest || "").trim();
 
-    // ✅ NEW: spoken-friendly, per-pause flavor line from the front-end (optional)
-    // Expected shape: profile.flavorByPause = { p1:"...", p2:"...", ... }
-    const flavorByPause = profile.flavorByPause && typeof profile.flavorByPause === "object"
-      ? profile.flavorByPause
-      : {};
-    const flavorLine = String(flavorByPause?.[pauseId] || "").trim();
+    // ✅ Theme flavor (best: provided by frontend; fallback: map by interest)
+    const flavorByPause =
+      profile.flavorByPause && typeof profile.flavorByPause === "object"
+        ? profile.flavorByPause
+        : {};
+    let flavorLine = String(flavorByPause?.[pauseId] || "").trim();
+    if (!flavorLine) {
+      flavorLine = fallbackFlavorLine(interest, pauseId);
+    }
 
     if (!pauseId) return res.status(400).json({ error: "Missing pauseId" });
 
@@ -114,8 +146,7 @@ export default async function handler(req, res) {
 
     const namePrefix = childName ? `${childName}, ` : "";
 
-    // ---- Cache key (avoid repeats during demo) ----
-    // Include flavorLine so different interests don't share cached replies
+    // ---- Cache key ----
     const cacheKey = JSON.stringify({
       p: pauseId,
       c: choiceNorm,
@@ -144,18 +175,16 @@ export default async function handler(req, res) {
       });
     }
 
-    // ---- Prompt: tuned for 5–7 (first grader) ----
+    // ---- Prompt: tuned for ages 5–7 ----
     const system =
       "You are Dr. Coli, a friendly broccoli teacher for kids ages 5–7. " +
       "Use super simple words (first-grade). " +
-      "Be warm, playful, and short. 1–2 sentences (max 3). " +
+      "Be warm, playful, and SHORT. 1–2 sentences (max 3). " +
       "Never mention AI or tech. Do not repeat yourself. " +
       "If isCorrect=true: DO NOT ask any question and do NOT introduce a new prompt or new scenario. " +
       "If isCorrect=false: You MAY end with ONE short question inviting the child to try again. " +
       'End with exactly: "Let’s keep going!"';
 
-    // ✅ Tell the model how to use the playful theme line (if provided)
-    // Important: do NOT force exact repetition (prevents stiff-sounding output)
     const user =
       `Pause ${pauseId}. Goal: ${expected.label}. Correct phrase: ${expected.correct}. ` +
       `Child said/tapped: "${choiceRaw}". (Normalized: "${choiceNorm}") ` +
@@ -165,7 +194,7 @@ export default async function handler(req, res) {
       `Rules:\n` +
       `- If correct: praise + confirm meaning. NO question. NO new prompt. Keep it short.\n` +
       `- If unsure: encourage + give correct phrase + meaning.\n` +
-      `- If wrong: say "Nice try!" + give correct phrase + meaning + one tiny hint.\n` +
+      `- If wrong: start with "Nice try!" + give correct phrase + meaning + one tiny hint.\n` +
       `- If you use the name, start with "${namePrefix}" (don’t overuse).\n` +
       `Return plain text only.`;
 
@@ -212,7 +241,6 @@ export default async function handler(req, res) {
     }
 
     if (!replyText) {
-      // fallback (still follows “no question when correct”)
       replyText = isCorrect
         ? `Great job! "${expected.correct}" is right. Let’s keep going!`
         : `Nice try! The right answer is ${expected.correct}. Can you try again? Let’s keep going!`;
@@ -236,8 +264,7 @@ export default async function handler(req, res) {
     if (isCorrect && /\?\s*Let’s keep going!\s*$/.test(replyText)) {
       const beforeEnding = replyText.replace(/\s*Let’s keep going!\s*$/, "").trim();
       const cleaned = stripTrailingQuestions(beforeEnding);
-      replyText =
-        (cleaned || beforeEnding).replace(/[.!?]*\s*$/, "").trim() + ". Let’s keep going!";
+      replyText = (cleaned || beforeEnding).replace(/[.!?]*\s*$/, "").trim() + ". Let’s keep going!";
     }
 
     // Remove rare exact duplication
@@ -262,8 +289,9 @@ export default async function handler(req, res) {
       },
     });
   } catch (e) {
-    return res
-      .status(500)
-      .json({ error: "Server crashed", details: String(e?.message || e) });
+    return res.status(500).json({
+      error: "Server crashed",
+      details: String(e?.message || e),
+    });
   }
 }
