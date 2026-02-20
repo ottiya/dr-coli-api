@@ -76,6 +76,13 @@ export default async function handler(req, res) {
     const childName = (profile.name || "").trim();
     const interest = (profile.interest || "").trim();
 
+    // ✅ NEW: spoken-friendly, per-pause flavor line from the front-end (optional)
+    // Expected shape: profile.flavorByPause = { p1:"...", p2:"...", ... }
+    const flavorByPause = profile.flavorByPause && typeof profile.flavorByPause === "object"
+      ? profile.flavorByPause
+      : {};
+    const flavorLine = String(flavorByPause?.[pauseId] || "").trim();
+
     if (!pauseId) return res.status(400).json({ error: "Missing pauseId" });
 
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -83,7 +90,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY on server" });
     }
 
-    // ---- Expected answers (RENUMBERED p1..p5) ----
+    // ---- Expected answers (p1..p5) ----
     const expectedMap = {
       p1: { correct: "한국어", label: "say 'Korean language' in Korean" },
       p2: { correct: "선생님", label: "say 'teacher' in Korean" },
@@ -105,26 +112,16 @@ export default async function handler(req, res) {
 
     const isCorrect = !isUnsure && choiceNorm === expectedNorm;
 
-    // ---- Optional personalization line ----
-    const interestLine = (() => {
-      if (!interest) return "";
-      const map = {
-        puppies: "Puppy power!",
-        dinos: "Dino power!",
-        planes: "Pilot power!",
-      };
-      return map[interest] || "";
-    })();
-
     const namePrefix = childName ? `${childName}, ` : "";
 
     // ---- Cache key (avoid repeats during demo) ----
-    // Use normalized choice so "안녕하세요!" and "안녕하세요" share cache
+    // Include flavorLine so different interests don't share cached replies
     const cacheKey = JSON.stringify({
       p: pauseId,
       c: choiceNorm,
       n: childName ? 1 : 0,
       i: interest || "",
+      f: flavorLine || "",
       ok: isCorrect ? 1 : 0,
       un: isUnsure ? 1 : 0,
     });
@@ -140,37 +137,36 @@ export default async function handler(req, res) {
           expected: expected.correct,
           isCorrect,
           isUnsure,
+          interest,
+          flavorLine,
           cached: true,
         },
       });
     }
 
-    // ---- Smaller prompt = faster ----
-    // ✅ Key changes:
-    //  - If correct: MUST NOT ask a question or introduce a new prompt/scenario.
-    //  - If not correct: MUST end with a short question inviting the child to try again.
-    //  - Always end with "Let’s keep going!" (your UI expects it).
+    // ---- Prompt: tuned for 5–7 (first grader) ----
     const system =
-      "You are Dr. Coli, a friendly broccoli teacher for kids 6–8. " +
-      "Respond in warm, simple English. 1–2 sentences (max 3). " +
+      "You are Dr. Coli, a friendly broccoli teacher for kids ages 5–7. " +
+      "Use super simple words (first-grade). " +
+      "Be warm, playful, and short. 1–2 sentences (max 3). " +
       "Never mention AI or tech. Do not repeat yourself. " +
-      "If isCorrect=true: DO NOT ask any question and do NOT introduce a new prompt. " +
-      "If isCorrect=false: You MAY end with one short question inviting the child to try again. " +
+      "If isCorrect=true: DO NOT ask any question and do NOT introduce a new prompt or new scenario. " +
+      "If isCorrect=false: You MAY end with ONE short question inviting the child to try again. " +
       'End with exactly: "Let’s keep going!"';
 
-    // ✅ Tell the model what *exact structure* to use.
+    // ✅ Tell the model how to use the playful theme line (if provided)
+    // Important: do NOT force exact repetition (prevents stiff-sounding output)
     const user =
-      `Pause ${pauseId}. Goal: ${expected.label}. Correct: ${expected.correct}. ` +
+      `Pause ${pauseId}. Goal: ${expected.label}. Correct phrase: ${expected.correct}. ` +
       `Child said/tapped: "${choiceRaw}". (Normalized: "${choiceNorm}") ` +
       `isCorrect=${isCorrect}. isUnsure=${isUnsure}. ` +
       (childName ? `Name: ${childName}. ` : "") +
-      (interestLine ? `Theme word: ${interestLine}. ` : "") +
+      (flavorLine ? `Playful theme line: "${flavorLine}". Use it naturally if it fits (you can rephrase). ` : "") +
       `Rules:\n` +
-      `- If correct: praise + confirm meaning. NO question. NO new scenario. Stop after encouragement.\n` +
+      `- If correct: praise + confirm meaning. NO question. NO new prompt. Keep it short.\n` +
       `- If unsure: encourage + give correct phrase + meaning.\n` +
       `- If wrong: say "Nice try!" + give correct phrase + meaning + one tiny hint.\n` +
       `- If you use the name, start with "${namePrefix}" (don’t overuse).\n` +
-      (interestLine ? `- Include "${interestLine}" as a very short sentence before the ending.\n` : "") +
       `Return plain text only.`;
 
     const r = await fetch("https://api.openai.com/v1/responses", {
@@ -181,8 +177,8 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        max_output_tokens: 70, // shorter output = lower latency
-        temperature: 0.35,
+        max_output_tokens: 80,
+        temperature: 0.4,
         input: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -218,8 +214,8 @@ export default async function handler(req, res) {
     if (!replyText) {
       // fallback (still follows “no question when correct”)
       replyText = isCorrect
-        ? `You got it! "${expected.correct}" is correct. Let’s keep going!`
-        : `Nice try! The right answer is ${expected.correct}. Want to try it again? Let’s keep going!`;
+        ? `Great job! "${expected.correct}" is right. Let’s keep going!`
+        : `Nice try! The right answer is ${expected.correct}. Can you try again? Let’s keep going!`;
     }
 
     // Normalize whitespace
@@ -238,10 +234,10 @@ export default async function handler(req, res) {
 
     // ✅ After enforcing ending, re-check: if correct, still no question before the ending.
     if (isCorrect && /\?\s*Let’s keep going!\s*$/.test(replyText)) {
-      // Remove the question sentence right before the ending.
       const beforeEnding = replyText.replace(/\s*Let’s keep going!\s*$/, "").trim();
       const cleaned = stripTrailingQuestions(beforeEnding);
-      replyText = (cleaned || beforeEnding).replace(/[.!?]*\s*$/, "").trim() + ". Let’s keep going!";
+      replyText =
+        (cleaned || beforeEnding).replace(/[.!?]*\s*$/, "").trim() + ". Let’s keep going!";
     }
 
     // Remove rare exact duplication
@@ -260,6 +256,8 @@ export default async function handler(req, res) {
         expected: expected.correct,
         isCorrect,
         isUnsure,
+        interest,
+        flavorLine,
         cached: false,
       },
     });
