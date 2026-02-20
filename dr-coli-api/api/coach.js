@@ -21,7 +21,7 @@ function cacheSet(key, value) {
 // Normalize STT quirks (spaces, punctuation, fullwidth punctuation)
 function norm(s) {
   return String(s || "")
-    .replace(/\s+/g, "")              // remove spaces: "안 녕 하 세 요" -> "안녕하세요"
+    .replace(/\s+/g, "")              // "안 녕 하 세 요" -> "안녕하세요"
     .replace(/[.?!,，。！？]/g, "")     // remove punctuation
     .trim();
 }
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
-  // Parse body safely
+  // Parse body safely (handles string body too)
   let body = {};
   try {
     body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
@@ -68,7 +68,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Missing OPENAI_API_KEY on server" });
     }
 
-    // ---- Expected answers (RENUMBERED p1..p5) ----
+    // ---- Expected answers (p1..p5) ----
     const expectedMap = {
       p1: { correct: "한국어", label: "say 'Korean language' in Korean" },
       p2: { correct: "선생님", label: "say 'teacher' in Korean" },
@@ -104,7 +104,6 @@ export default async function handler(req, res) {
     const namePrefix = childName ? `${childName}, ` : "";
 
     // ---- Cache key (avoid repeats during demo) ----
-    // Use normalized choice so "안녕하세요!" and "안녕하세요" share cache
     const cacheKey = JSON.stringify({
       p: pauseId,
       c: choiceNorm,
@@ -130,11 +129,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // ---- Smaller prompt = faster ----
+    // ---- Prompt (playful, still short + consistent ending) ----
     const system =
       "You are Dr. Coli, a friendly broccoli teacher for kids 6–8. " +
-      "Respond in warm, simple English. 1–2 sentences (max 3). " +
+      "Respond in warm, playful, simple English. 1–2 sentences (max 3). " +
       "Never mention AI or tech. Do not repeat yourself. " +
+      "On correct answers, you may add one tiny celebration like 'Woohoo!' (max 2 words). " +
       'End with exactly: "Let’s keep going!"';
 
     const user =
@@ -157,8 +157,8 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        max_output_tokens: 70, // shorter output = lower latency
-        temperature: 0.4,
+        max_output_tokens: 75,
+        temperature: 0.5,
         input: [
           { role: "system", content: system },
           { role: "user", content: user },
