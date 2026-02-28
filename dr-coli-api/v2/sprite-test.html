@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bori Game – Sprite Test</title>
+  <style>
+    body {
+      background: #00f2fe;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    canvas {
+      width: 400px;
+      height: 400px;
+      image-rendering: auto;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="game" width="400" height="400"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+// Paths are relative to THIS html file (v2/sprite-test.html)
+const atlases = [
+  {
+    image: "../assets/bori/idle/Bori_Idle-0.png",
+    data:  "../assets/bori/idle/Bori_Idle-0.json"
+  },
+  {
+    image: "../assets/bori/idle/Bori_Idle-1.png",
+    data:  "../assets/bori/idle/Bori_Idle-1.json"
+  }
+];
+
+// ---- TUNE THESE ----
+const FPS = 8;        // idle speed
+const SCALE = 0.35;   // <-- make smaller/bigger (try 0.25–0.6)
+// --------------------
+
+let frames = [];
+let frameIndex = 0;
+let dir = 1;          // ping-pong direction: +1 forward, -1 backward
+let lastTime = 0;
+
+async function loadAtlas({ image, data }) {
+  const img = new Image();
+  img.src = image;
+  await img.decode();
+
+  const json = await fetch(data).then(r => r.json());
+  const frameMap = json.frames ? json.frames : json;
+
+  for (const name of Object.keys(frameMap)) {
+    const f = frameMap[name];
+    frames.push({
+      name,
+      img,
+      frame: f.frame,
+      spriteSourceSize: f.spriteSourceSize,
+      sourceSize: f.sourceSize,
+      rotated: !!f.rotated
+    });
+  }
+}
+
+// Ensure frames play in numeric filename order
+function sortFrames() {
+  frames.sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
+  );
+}
+
+function drawFrame(F) {
+  if (F.rotated) return; // rotation should be off in TexturePacker
+
+  const { x, y, w, h } = F.frame;
+  const ss = F.spriteSourceSize; // where trimmed sprite sits
+  const src = F.sourceSize;      // original full frame size
+
+  // "virtual full frame" size after scaling
+  const drawW = src.w * SCALE;
+  const drawH = src.h * SCALE;
+
+  // center the full frame inside the canvas
+  const dx0 = (canvas.width - drawW) / 2;
+  const dy0 = (canvas.height - drawH) / 2;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // draw trimmed piece into its correct spot inside the full frame
+  ctx.drawImage(
+    F.img,
+    x, y, w, h,
+    dx0 + ss.x * SCALE,
+    dy0 + ss.y * SCALE,
+    ss.w * SCALE,
+    ss.h * SCALE
+  );
+}
+
+function advancePingPong() {
+  frameIndex += dir;
+
+  // ping-pong WITHOUT repeating endpoints
+  if (frameIndex >= frames.length - 1) {
+    frameIndex = frames.length - 1;
+    dir = -1;
+  } else if (frameIndex <= 0) {
+    frameIndex = 0;
+    dir = 1;
+  }
+}
+
+function loop(time) {
+  if (frames.length === 0) return;
+
+  if (time - lastTime > 1000 / FPS) {
+    advancePingPong();
+    lastTime = time;
+  }
+
+  drawFrame(frames[frameIndex]);
+  requestAnimationFrame(loop);
+}
+
+(async function init() {
+  for (const a of atlases) await loadAtlas(a);
+  sortFrames();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
