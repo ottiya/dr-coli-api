@@ -1,0 +1,117 @@
+{"frames": {
+
+"Bori_Look_00000032.png":
+{
+	"frame": {"x":2,"y":2,"w":576,"h":675},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":680,"y":215,"w":576,"h":675},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000033.png":
+{
+	"frame": {"x":582,"y":2,"w":573,"h":675},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":683,"y":215,"w":573,"h":675},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000034.png":
+{
+	"frame": {"x":1159,"y":2,"w":575,"h":676},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":684,"y":214,"w":575,"h":676},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000035.png":
+{
+	"frame": {"x":1738,"y":2,"w":573,"h":676},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":686,"y":214,"w":573,"h":676},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000037.png":
+{
+	"frame": {"x":2315,"y":2,"w":571,"h":676},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":690,"y":214,"w":571,"h":676},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000038.png":
+{
+	"frame": {"x":2890,"y":2,"w":569,"h":676},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":690,"y":214,"w":569,"h":676},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000039.png":
+{
+	"frame": {"x":1134,"y":682,"w":567,"h":676},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":692,"y":214,"w":567,"h":676},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000040.png":
+{
+	"frame": {"x":1705,"y":682,"w":566,"h":676},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":693,"y":214,"w":566,"h":676},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000041.png":
+{
+	"frame": {"x":2275,"y":682,"w":564,"h":676},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":693,"y":214,"w":564,"h":676},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000043.png":
+{
+	"frame": {"x":2843,"y":682,"w":563,"h":676},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":693,"y":214,"w":563,"h":676},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000045.png":
+{
+	"frame": {"x":569,"y":681,"w":561,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":695,"y":214,"w":561,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000046.png":
+{
+	"frame": {"x":2,"y":681,"w":563,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":693,"y":214,"w":563,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Look_00000047.png":
+{
+	"frame": {"x":3410,"y":682,"w":563,"h":676},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":693,"y":214,"w":563,"h":676},
+	"sourceSize": {"w":1920,"h":1080}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "Bori_Look-1.png",
+	"format": "RGBA8888",
+	"size": {"w":3975,"h":1361},
+	"scale": "1",
+	"related_multi_packs": [ "Bori_Look-0.json" ],
+	"smartupdate": "$TexturePacker:SmartUpdate:5a68e1c4fb3e11f04a8063782a5ebb88:e9097cbb74628824718ecb18c4979b0b:a9f3ea7e57edcfdb93cb41529be6fa08$"
+}
+}
