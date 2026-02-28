@@ -1,0 +1,252 @@
+{"frames": {
+
+"Dr.Coli_Talk_000.png":
+{
+	"frame": {"x":1304,"y":2450,"w":650,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":669,"y":155,"w":650,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_001.png":
+{
+	"frame": {"x":1958,"y":2450,"w":650,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":669,"y":155,"w":650,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_002.png":
+{
+	"frame": {"x":2612,"y":2450,"w":650,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":669,"y":155,"w":650,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_003.png":
+{
+	"frame": {"x":2,"y":3266,"w":650,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":669,"y":155,"w":650,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_004.png":
+{
+	"frame": {"x":656,"y":3267,"w":650,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":669,"y":155,"w":650,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_005.png":
+{
+	"frame": {"x":2,"y":2,"w":650,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":669,"y":155,"w":650,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_006.png":
+{
+	"frame": {"x":656,"y":2,"w":650,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":669,"y":155,"w":650,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_007.png":
+{
+	"frame": {"x":1310,"y":2,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_008.png":
+{
+	"frame": {"x":1962,"y":2,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_009.png":
+{
+	"frame": {"x":2614,"y":2,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_010.png":
+{
+	"frame": {"x":2,"y":818,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_011.png":
+{
+	"frame": {"x":654,"y":818,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_012.png":
+{
+	"frame": {"x":1306,"y":818,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_013.png":
+{
+	"frame": {"x":1958,"y":818,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_014.png":
+{
+	"frame": {"x":2610,"y":818,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_015.png":
+{
+	"frame": {"x":3262,"y":818,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_016.png":
+{
+	"frame": {"x":1310,"y":3267,"w":648,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_017.png":
+{
+	"frame": {"x":1962,"y":3267,"w":648,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_018.png":
+{
+	"frame": {"x":2614,"y":3267,"w":648,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_019.png":
+{
+	"frame": {"x":2,"y":1634,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_020.png":
+{
+	"frame": {"x":654,"y":1634,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_021.png":
+{
+	"frame": {"x":1306,"y":1634,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_022.png":
+{
+	"frame": {"x":1958,"y":1634,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_023.png":
+{
+	"frame": {"x":3266,"y":2,"w":646,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":646,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_024.png":
+{
+	"frame": {"x":654,"y":2450,"w":646,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":646,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_025.png":
+{
+	"frame": {"x":2610,"y":1634,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_026.png":
+{
+	"frame": {"x":3262,"y":1634,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_027.png":
+{
+	"frame": {"x":2,"y":2450,"w":648,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":648,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_028.png":
+{
+	"frame": {"x":3266,"y":2450,"w":646,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":646,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Talk_029.png":
+{
+	"frame": {"x":3266,"y":3267,"w":646,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":155,"w":646,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "Dr.Coli_Talk-0.png",
+	"format": "RGBA8888",
+	"size": {"w":3914,"h":4082},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:e134dce10dc95cfbf3779bba7df8ef9e:747f3e2a6796a2e76a0fa2d767376b1e:286770cf54a94bfd85266d689a53be6a$"
+}
+}
