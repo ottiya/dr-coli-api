@@ -1,0 +1,180 @@
+{"frames": {
+
+"Bori_Wave_00000000.png":
+{
+	"frame": {"x":609,"y":2094,"w":602,"h":684},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":660,"y":214,"w":602,"h":684},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000001.png":
+{
+	"frame": {"x":1281,"y":1404,"w":602,"h":686},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":660,"y":212,"w":602,"h":686},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000002.png":
+{
+	"frame": {"x":2,"y":2073,"w":603,"h":686},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":659,"y":212,"w":603,"h":686},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000003.png":
+{
+	"frame": {"x":1358,"y":2,"w":603,"h":686},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":659,"y":212,"w":603,"h":686},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000004.png":
+{
+	"frame": {"x":1965,"y":2,"w":603,"h":686},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":659,"y":212,"w":603,"h":686},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000005.png":
+{
+	"frame": {"x":2572,"y":2,"w":603,"h":686},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":659,"y":212,"w":603,"h":686},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000006.png":
+{
+	"frame": {"x":674,"y":1404,"w":603,"h":686},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":659,"y":212,"w":603,"h":686},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000007.png":
+{
+	"frame": {"x":1215,"y":2094,"w":602,"h":684},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":660,"y":214,"w":602,"h":684},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000008.png":
+{
+	"frame": {"x":701,"y":720,"w":605,"h":680},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":660,"y":218,"w":605,"h":680},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000009.png":
+{
+	"frame": {"x":1310,"y":720,"w":603,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":662,"y":220,"w":603,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000010.png":
+{
+	"frame": {"x":2520,"y":692,"w":602,"h":674},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":663,"y":224,"w":602,"h":674},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000011.png":
+{
+	"frame": {"x":1887,"y":1402,"w":594,"h":668},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":668,"y":230,"w":594,"h":668},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000012.png":
+{
+	"frame": {"x":2485,"y":1385,"w":586,"h":667},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":231,"w":586,"h":667},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000013.png":
+{
+	"frame": {"x":1821,"y":2094,"w":578,"h":683},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":675,"y":215,"w":578,"h":683},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000014.png":
+{
+	"frame": {"x":2403,"y":2074,"w":575,"h":695},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":675,"y":201,"w":575,"h":695},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000015.png":
+{
+	"frame": {"x":2982,"y":2056,"w":581,"h":690},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":672,"y":175,"w":581,"h":690},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000016.png":
+{
+	"frame": {"x":1917,"y":692,"w":599,"h":689},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":660,"y":154,"w":599,"h":689},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000017.png":
+{
+	"frame": {"x":719,"y":2,"w":635,"h":714},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":641,"y":142,"w":635,"h":714},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000018.png":
+{
+	"frame": {"x":2,"y":1376,"w":668,"h":693},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":625,"y":143,"w":668,"h":693},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000019.png":
+{
+	"frame": {"x":2,"y":691,"w":695,"h":681},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":612,"y":148,"w":695,"h":681},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Wave_00000020.png":
+{
+	"frame": {"x":2,"y":2,"w":713,"h":685},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":606,"y":157,"w":713,"h":685},
+	"sourceSize": {"w":1920,"h":1080}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "Bori_Wave.png",
+	"format": "RGBA8888",
+	"size": {"w":3565,"h":2780},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:6197fe10320a1a8cb73acf4179112823:677a52369a5ac7fa95251e7a99cec160:d58efc082bc3f7b6ba9a7e9c494d4e51$"
+}
+}
