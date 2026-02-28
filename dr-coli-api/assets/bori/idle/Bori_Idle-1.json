@@ -1,0 +1,85 @@
+{"frames": {
+
+"Bori_Idle_00000005.png":
+{
+	"frame": {"x":2,"y":2,"w":1082,"h":972},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":419,"y":108,"w":1082,"h":972},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Idle_00000006.png":
+{
+	"frame": {"x":1088,"y":2,"w":1082,"h":1056},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":419,"y":24,"w":1082,"h":1056},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Idle_00000009.png":
+{
+	"frame": {"x":2174,"y":2,"w":1082,"h":1059},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":419,"y":21,"w":1082,"h":1059},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Idle_00000010.png":
+{
+	"frame": {"x":2,"y":978,"w":1082,"h":1080},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":419,"y":0,"w":1082,"h":1080},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Idle_00000011.png":
+{
+	"frame": {"x":1088,"y":1062,"w":1082,"h":1080},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":419,"y":0,"w":1082,"h":1080},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Idle_00000012.png":
+{
+	"frame": {"x":2174,"y":1065,"w":1082,"h":1080},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":419,"y":0,"w":1082,"h":1080},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Idle_00000016.png":
+{
+	"frame": {"x":2,"y":2062,"w":1082,"h":1080},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":419,"y":0,"w":1082,"h":1080},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Idle_00000017.png":
+{
+	"frame": {"x":1088,"y":2146,"w":1082,"h":1080},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":419,"y":0,"w":1082,"h":1080},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Idle_00000018.png":
+{
+	"frame": {"x":2174,"y":2149,"w":1082,"h":1080},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":419,"y":0,"w":1082,"h":1080},
+	"sourceSize": {"w":1920,"h":1080}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "Bori_Idle-1.png",
+	"format": "RGBA8888",
+	"size": {"w":3258,"h":3231},
+	"scale": "1",
+	"related_multi_packs": [ "Bori_Idle-0.json" ],
+	"smartupdate": "$TexturePacker:SmartUpdate:8c9a8d70be1bddd35f71f41cd0df3315:a35dc38e08c52f0366d3723129510d64:be06c4927452470e2f4808263124b17b$"
+}
+}
