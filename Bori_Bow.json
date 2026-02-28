@@ -1,0 +1,180 @@
+{"frames": {
+
+"Bori_Bow00000000.png":
+{
+	"frame": {"x":2,"y":2028,"w":596,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":660,"y":214,"w":596,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000001.png":
+{
+	"frame": {"x":1833,"y":2036,"w":595,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":661,"y":214,"w":595,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000002.png":
+{
+	"frame": {"x":2,"y":2710,"w":595,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":661,"y":214,"w":595,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000003.png":
+{
+	"frame": {"x":2,"y":666,"w":596,"h":677},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":660,"y":215,"w":596,"h":677},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000004.png":
+{
+	"frame": {"x":601,"y":2710,"w":596,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":660,"y":214,"w":596,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000005.png":
+{
+	"frame": {"x":2,"y":1347,"w":596,"h":677},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":660,"y":215,"w":596,"h":677},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000006.png":
+{
+	"frame": {"x":602,"y":1348,"w":597,"h":677},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":659,"y":215,"w":597,"h":677},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000007.png":
+{
+	"frame": {"x":1203,"y":1355,"w":597,"h":677},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":659,"y":215,"w":597,"h":677},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000008.png":
+{
+	"frame": {"x":1804,"y":1355,"w":597,"h":677},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":659,"y":215,"w":597,"h":677},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000009.png":
+{
+	"frame": {"x":602,"y":2029,"w":597,"h":677},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":659,"y":215,"w":597,"h":677},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000010.png":
+{
+	"frame": {"x":1201,"y":2717,"w":598,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":658,"y":214,"w":598,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000011.png":
+{
+	"frame": {"x":1803,"y":2718,"w":599,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":658,"y":214,"w":599,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000012.png":
+{
+	"frame": {"x":2,"y":3392,"w":604,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":655,"y":214,"w":604,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000013.png":
+{
+	"frame": {"x":610,"y":3399,"w":610,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":652,"y":214,"w":610,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000014.png":
+{
+	"frame": {"x":1224,"y":3400,"w":619,"h":678},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":647,"y":214,"w":619,"h":678},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000015.png":
+{
+	"frame": {"x":1203,"y":2036,"w":626,"h":677},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":645,"y":215,"w":626,"h":677},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000016.png":
+{
+	"frame": {"x":1238,"y":675,"w":632,"h":676},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":642,"y":216,"w":632,"h":676},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000017.png":
+{
+	"frame": {"x":602,"y":671,"w":632,"h":673},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":642,"y":219,"w":632,"h":673},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000018.png":
+{
+	"frame": {"x":1255,"y":2,"w":629,"h":669},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":643,"y":223,"w":629,"h":669},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000019.png":
+{
+	"frame": {"x":626,"y":2,"w":625,"h":665},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":646,"y":227,"w":625,"h":665},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Bori_Bow00000020.png":
+{
+	"frame": {"x":2,"y":2,"w":620,"h":660},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":648,"y":232,"w":620,"h":660},
+	"sourceSize": {"w":1920,"h":1080}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "Bori_Bow.png",
+	"format": "RGBA8888",
+	"size": {"w":2430,"h":4080},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:d303ae1af5f82c471e38f45675fe1c34:2963569281ee75a874852240b0d25d89:0146404638c847eaca7b2af070a4f32b$"
+}
+}
