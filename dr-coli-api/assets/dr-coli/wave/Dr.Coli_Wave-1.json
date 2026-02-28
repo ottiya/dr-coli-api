@@ -1,0 +1,93 @@
+{"frames": {
+
+"Dr.Coli_Wave_003.png":
+{
+	"frame": {"x":1309,"y":2,"w":648,"h":810},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":157,"w":648,"h":810},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_004.png":
+{
+	"frame": {"x":2,"y":816,"w":648,"h":810},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":668,"y":157,"w":648,"h":810},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_006.png":
+{
+	"frame": {"x":1961,"y":2,"w":644,"h":818},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":657,"y":149,"w":644,"h":818},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_017.png":
+{
+	"frame": {"x":2609,"y":2,"w":647,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":663,"y":154,"w":647,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_018.png":
+{
+	"frame": {"x":2609,"y":819,"w":647,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":663,"y":154,"w":647,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_019.png":
+{
+	"frame": {"x":654,"y":816,"w":648,"h":810},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":668,"y":157,"w":648,"h":810},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_020.png":
+{
+	"frame": {"x":2,"y":2,"w":650,"h":810},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":672,"y":157,"w":650,"h":810},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_021.png":
+{
+	"frame": {"x":656,"y":2,"w":649,"h":810},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":671,"y":157,"w":649,"h":810},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_022.png":
+{
+	"frame": {"x":1956,"y":824,"w":647,"h":810},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":669,"y":157,"w":647,"h":810},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_023.png":
+{
+	"frame": {"x":1306,"y":816,"w":646,"h":811},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":665,"y":156,"w":646,"h":811},
+	"sourceSize": {"w":1920,"h":1080}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "Dr.Coli_Wave-1.png",
+	"format": "RGBA8888",
+	"size": {"w":3258,"h":1636},
+	"scale": "1",
+	"related_multi_packs": [ "Dr.Coli_Wave-0.json" ],
+	"smartupdate": "$TexturePacker:SmartUpdate:24ddb056b5c883717e3916847a575b71:d212037622997843e770f8fddc221568:6a973d19cfec7cd48d4ae0a4a5246f24$"
+}
+}

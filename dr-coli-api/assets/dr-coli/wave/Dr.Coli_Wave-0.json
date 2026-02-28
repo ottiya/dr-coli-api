@@ -1,0 +1,205 @@
+{"frames": {
+
+"Dr.Coli_Wave_000.png":
+{
+	"frame": {"x":1944,"y":2,"w":650,"h":812},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":669,"y":155,"w":650,"h":812},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_001.png":
+{
+	"frame": {"x":2598,"y":2,"w":649,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":674,"y":155,"w":649,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_002.png":
+{
+	"frame": {"x":1290,"y":2,"w":650,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":675,"y":155,"w":650,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_005.png":
+{
+	"frame": {"x":3168,"y":837,"w":648,"h":813},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":665,"y":154,"w":648,"h":813},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_007.png":
+{
+	"frame": {"x":644,"y":2,"w":642,"h":822},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":651,"y":145,"w":642,"h":822},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_008.png":
+{
+	"frame": {"x":642,"y":834,"w":630,"h":828},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":638,"y":139,"w":630,"h":828},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_009.png":
+{
+	"frame": {"x":1934,"y":1654,"w":632,"h":830},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":632,"y":137,"w":632,"h":830},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_010.png":
+{
+	"frame": {"x":3251,"y":2,"w":628,"h":831},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":629,"y":136,"w":628,"h":831},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_011.png":
+{
+	"frame": {"x":1907,"y":819,"w":629,"h":831},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":629,"y":136,"w":629,"h":831},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_012.png":
+{
+	"frame": {"x":2570,"y":1654,"w":629,"h":830},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":633,"y":137,"w":629,"h":830},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_013.png":
+{
+	"frame": {"x":2,"y":834,"w":636,"h":828},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":641,"y":139,"w":636,"h":828},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_014.png":
+{
+	"frame": {"x":2,"y":2,"w":638,"h":828},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":642,"y":139,"w":638,"h":828},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_015.png":
+{
+	"frame": {"x":2,"y":2497,"w":641,"h":822},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":651,"y":145,"w":641,"h":822},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_016.png":
+{
+	"frame": {"x":647,"y":2495,"w":644,"h":819},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":657,"y":148,"w":644,"h":819},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_024.png":
+{
+	"frame": {"x":1286,"y":1664,"w":644,"h":819},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":657,"y":148,"w":644,"h":819},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_025.png":
+{
+	"frame": {"x":643,"y":1666,"w":639,"h":825},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":647,"y":142,"w":639,"h":825},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_026.png":
+{
+	"frame": {"x":3203,"y":1654,"w":633,"h":828},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":641,"y":139,"w":633,"h":828},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_027.png":
+{
+	"frame": {"x":1924,"y":2488,"w":630,"h":831},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":636,"y":137,"w":630,"h":831},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_028.png":
+{
+	"frame": {"x":2558,"y":2488,"w":628,"h":831},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":632,"y":137,"w":628,"h":831},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_029.png":
+{
+	"frame": {"x":1276,"y":828,"w":627,"h":832},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":629,"y":136,"w":627,"h":832},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_030.png":
+{
+	"frame": {"x":1295,"y":2487,"w":625,"h":832},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":629,"y":136,"w":625,"h":832},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_031.png":
+{
+	"frame": {"x":2540,"y":819,"w":624,"h":831},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":629,"y":136,"w":624,"h":831},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_032.png":
+{
+	"frame": {"x":3190,"y":2488,"w":624,"h":831},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":629,"y":136,"w":624,"h":831},
+	"sourceSize": {"w":1920,"h":1080}
+},
+"Dr.Coli_Wave_033.png":
+{
+	"frame": {"x":2,"y":1666,"w":637,"h":827},
+	"rotated": false,
+	"trimmed": true,
+	"spriteSourceSize": {"x":642,"y":141,"w":637,"h":827},
+	"sourceSize": {"w":1920,"h":1080}
+}},
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "Dr.Coli_Wave-0.png",
+	"format": "RGBA8888",
+	"size": {"w":3881,"h":3321},
+	"scale": "1",
+	"related_multi_packs": [ "Dr.Coli_Wave-1.json" ],
+	"smartupdate": "$TexturePacker:SmartUpdate:24ddb056b5c883717e3916847a575b71:d212037622997843e770f8fddc221568:6a973d19cfec7cd48d4ae0a4a5246f24$"
+}
+}
