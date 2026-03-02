@@ -265,8 +265,10 @@ function showMic(targetKorean) {
   micButtonEl.onclick = async () => {
     micButtonEl.onclick = null;
 
-    showDialogue("Say it out loud! 🎤");
+    showDialogue("I’m listening… 🎤");
+micButtonEl.classList.add("listening");
     const transcript = await recordAndTranscribeOnce();
+    micButtonEl.classList.remove("listening");
 
     if (!transcript) {
       showDialogue("I couldn’t hear that—try again! 🎤");
