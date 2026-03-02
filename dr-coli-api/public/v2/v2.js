@@ -1,4 +1,4 @@
-/* public/v2/v2.js — Episode engine + ElevenLabs pregen (Blob cached) + tap-anywhere audio unlock */
+/* public/v2/v2.js — Episode engine + ElevenLabs TTS + STT mic checking */
 
 let currentSceneIndex = 0;
 let episodeData = null;
@@ -16,27 +16,20 @@ const fxLayer = document.getElementById("fxLayer");
 
 const audioGateEl = document.getElementById("audioGate");
 
-// single shared audio element (more reliable)
-const audio = new Audio();
-audio.preload = "auto";
+// shared audio for TTS
+const ttsAudio = new Audio();
+ttsAudio.preload = "auto";
 
 boot().catch((e) => console.error("BOOT ERROR:", e));
 
 async function boot() {
   setBackground("/assets/backgrounds/bg-puppies.png");
-
   episodeData = await fetchJson("/lessons/episode-01.json");
-
-  // Must tap once to unlock audio
   await waitForAudioUnlock();
 
-  // Generate Scene 0 first so first lines aren’t silent
+  // Generate Scene 0 first so we start strong
   await preGenerateSceneAudio(episodeData, 0);
-
-  // Generate remaining scenes in background
-  preGenerateRemainingScenes(episodeData).catch((e) =>
-    console.warn("Background pregen error:", e)
-  );
+  preGenerateRemainingScenes(episodeData).catch(console.warn);
 
   playScene(0);
 }
@@ -44,16 +37,15 @@ async function boot() {
 /* ===== Audio unlock (tap anywhere) ===== */
 function waitForAudioUnlock() {
   return new Promise((resolve) => {
-    // Show overlay
     audioGateEl.classList.remove("hidden");
 
     const unlock = async () => {
       try {
-        audio.src = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA";
-        await audio.play().catch(() => {});
-        audio.pause();
-        audio.currentTime = 0;
-        audio.src = "";
+        ttsAudio.src = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA";
+        await ttsAudio.play().catch(() => {});
+        ttsAudio.pause();
+        ttsAudio.currentTime = 0;
+        ttsAudio.src = "";
       } catch {}
 
       audioGateEl.classList.add("hidden");
@@ -61,7 +53,6 @@ function waitForAudioUnlock() {
       resolve();
     };
 
-    // Any tap/click anywhere unlocks
     audioGateEl.addEventListener("pointerdown", unlock, { once: true });
   });
 }
@@ -77,12 +68,11 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/* ===== Background ===== */
 function setBackground(path) {
   bgLayer.style.backgroundImage = `url("${path}")`;
 }
 
-/* ===== TTS helpers ===== */
+/* ===== TTS (ElevenLabs cached) ===== */
 async function getElevenLabsTtsUrl(text) {
   const res = await fetch("/api/tts-elevenlabs", {
     method: "POST",
@@ -163,28 +153,28 @@ function hideDialogue() {
   dialogueTextEl.textContent = "";
 }
 
-function stopAudio() {
+function stopTts() {
   try {
-    audio.pause();
-    audio.currentTime = 0;
+    ttsAudio.pause();
+    ttsAudio.currentTime = 0;
   } catch {}
 }
 
-function playAudioUrl(url) {
+function playTtsUrl(url) {
   return new Promise((resolve) => {
-    stopAudio();
-    audio.src = url;
+    stopTts();
+    ttsAudio.src = url;
 
     const cleanup = () => {
-      audio.onended = null;
-      audio.onerror = null;
+      ttsAudio.onended = null;
+      ttsAudio.onerror = null;
       resolve();
     };
 
-    audio.onended = cleanup;
-    audio.onerror = cleanup;
+    ttsAudio.onended = cleanup;
+    ttsAudio.onerror = cleanup;
 
-    audio.play().catch(cleanup);
+    ttsAudio.play().catch(cleanup);
   });
 }
 
@@ -208,14 +198,14 @@ async function playDialogueWithAudio(lines, urls, done) {
     }
 
     if (url) {
-      await playAudioUrl(url);
-      await sleep(180);
+      await playTtsUrl(url);
+      await sleep(160);
     } else {
-      await sleep(Math.max(900, Math.min(2200, text.length * 35)));
+      await sleep(Math.max(850, Math.min(2000, text.length * 30)));
     }
   }
 
-  await sleep(200);
+  await sleep(150);
   hideDialogue();
   done?.();
 }
@@ -223,7 +213,7 @@ async function playDialogueWithAudio(lines, urls, done) {
 /* ===== Interaction ===== */
 function enableInteraction(interaction) {
   if (!interaction || interaction.type === "none") {
-    setTimeout(() => playScene(currentSceneIndex + 1), 800);
+    setTimeout(() => playScene(currentSceneIndex + 1), 700);
     return;
   }
 
@@ -236,11 +226,11 @@ function enableInteraction(interaction) {
   }
 
   if (interaction.type === "mic") {
-    showMic();
+    showMic(interaction.target || "");
     return;
   }
 
-  setTimeout(() => playScene(currentSceneIndex + 1), 800);
+  setTimeout(() => playScene(currentSceneIndex + 1), 700);
 }
 
 /* ===== Emoji tray ===== */
@@ -269,12 +259,45 @@ function hideEmojiTray() {
   emojiButtons.forEach((btn) => (btn.onclick = null));
 }
 
-/* ===== Mic ===== */
-function showMic() {
+/* ===== Mic + STT ===== */
+function showMic(targetKorean) {
   micButtonEl.classList.remove("hidden");
-  micButtonEl.onclick = () => {
-    hideMic();
-    playScene(currentSceneIndex + 1);
+  micButtonEl.onclick = async () => {
+    micButtonEl.onclick = null;
+
+    showDialogue("Say it out loud! 🎤");
+    const transcript = await recordAndTranscribeOnce();
+
+    if (!transcript) {
+      showDialogue("I couldn’t hear that—try again! 🎤");
+      micButtonEl.onclick = () => showMic(targetKorean);
+      micButtonEl.classList.remove("hidden");
+      return;
+    }
+
+    const heard = transcript.trim();
+    const ok = isForgivingMatch(heard, targetKorean);
+
+    // show what we heard (helps debugging + kids love it)
+    showDialogue(`I heard: “${heard}”`);
+
+    if (ok) {
+      confettiFullScreen();
+      setTimeout(() => {
+        showDialogue("Yes!! Amazing job! ⭐");
+      }, 350);
+
+      setTimeout(() => {
+        hideMic();
+        playScene(currentSceneIndex + 1);
+      }, 1200);
+    } else {
+      setTimeout(() => {
+        showDialogue("So close! Let’s try together one more time.");
+        micButtonEl.classList.remove("hidden");
+        micButtonEl.onclick = () => showMic(targetKorean);
+      }, 900);
+    }
   };
 }
 
@@ -283,31 +306,176 @@ function hideMic() {
   micButtonEl.onclick = null;
 }
 
+// Records ~2.2 seconds and transcribes via /api/stt
+async function recordAndTranscribeOnce() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mime = pickRecorderMimeType();
+    const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+
+    const chunks = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunks.push(e.data);
+    };
+
+    const stopped = new Promise((resolve) => (recorder.onstop = resolve));
+
+    recorder.start();
+
+    // record a short burst (kid phrase)
+    await sleep(2200);
+    recorder.stop();
+
+    await stopped;
+
+    // stop mic
+    stream.getTracks().forEach((t) => t.stop());
+
+    const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+    if (blob.size < 5000) return null;
+
+    const file = new File([blob], "speech.webm", { type: blob.type });
+
+    const form = new FormData();
+    form.append("file", file);                 // OpenAI expects "file" in multipart
+    form.append("model", "gpt-4o-mini-transcribe"); // fast+good :contentReference[oaicite:3]{index=3}
+    form.append("language", "ko");
+
+    const res = await fetch("/api/stt", { method: "POST", body: form });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error("STT failed:", res.status, detail);
+      return null;
+    }
+
+    const data = await res.json().catch(() => null);
+    return data?.text || null;
+  } catch (e) {
+    console.error("recordAndTranscribeOnce error:", e);
+    return null;
+  }
+}
+
+function pickRecorderMimeType() {
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/ogg",
+  ];
+  for (const c of candidates) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
+  }
+  return "";
+}
+
+/* ===== Forgiving matching ===== */
+
+// normalize Korean text for comparison
+function normalizeKo(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[.,!?~'"“”‘’]/g, "")
+    .replace(/-/g, "")
+    // common ASR-ish variants that show up with kids
+    .replace(/세이요/g, "세요")
+    .replace(/하세용/g, "하세요")
+    .replace(/하세여/g, "하세요");
+}
+
+// collapse repeats like "안녕하세요안녕하세요" -> "안녕하세요"
+function collapseRepeats(norm, targetNorm) {
+  if (!targetNorm) return norm;
+  while (norm.includes(targetNorm + targetNorm)) {
+    norm = norm.replace(targetNorm + targetNorm, targetNorm);
+  }
+  return norm;
+}
+
+// Levenshtein distance (small + fast)
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  const dp = new Array(n + 1);
+  for (let j = 0; j <= n; j++) dp[j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const temp = dp[j];
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + cost);
+      prev = temp;
+    }
+  }
+  return dp[n];
+}
+
+// forgiving match for Korean target phrases
+function isForgivingMatch(heardRaw, targetRaw) {
+  const target = normalizeKo(targetRaw);
+  if (!target) return true;
+
+  let heard = normalizeKo(heardRaw);
+  heard = collapseRepeats(heard, target);
+
+  // 1) perfect or contains (handles extra words)
+  if (heard === target) return true;
+  if (heard.includes(target)) return true;
+
+  // 2) allow a small edit distance (kids speech / ASR quirks)
+  const d = levenshtein(heard, target);
+
+  // very short targets need stricter matching
+  if (target.length <= 2) return d <= 0; // e.g., "안녕" shouldn’t accept too much
+  if (target.length <= 4) return d <= 1;
+  return d <= 2; // "안녕하세요" forgiving
+}
+
 /* ===== Confetti ===== */
 function confettiFullScreen() {
   clearFx();
 
-  const img = document.createElement("img");
-  img.src = "/assets/ui/confetti-star.png";
-  img.alt = "";
-  img.style.position = "absolute";
-  img.style.left = "0";
-  img.style.top = "-20%";
-  img.style.width = "100%";
-  img.style.opacity = "0.95";
-  img.style.pointerEvents = "none";
+  const PIECES = 28;
+  const DURATION_MIN = 1200;
+  const DURATION_MAX = 2200;
 
-  img.animate(
-    [
-      { transform: "translateY(0)", opacity: 0.95 },
-      { transform: "translateY(140%)", opacity: 0.95 },
-      { transform: "translateY(160%)", opacity: 0 },
-    ],
-    { duration: 1800, easing: "ease-in", fill: "forwards" }
-  );
+  for (let i = 0; i < PIECES; i++) {
+    const el = document.createElement("img");
+    el.src = "/assets/ui/confetti-star.png";
+    el.alt = "";
+    el.style.position = "absolute";
+    el.style.top = "-10%";
+    el.style.left = `${Math.random() * 100}%`;
+    el.style.pointerEvents = "none";
+    el.style.opacity = "0.95";
 
-  fxLayer.appendChild(img);
-  setTimeout(clearFx, 1900);
+    const scale = 0.35 + Math.random() * 0.15;
+    el.style.transform = `translate(-50%, 0) scale(${scale})`;
+
+    fxLayer.appendChild(el);
+
+    const drift = Math.random() * 120 - 60;
+    const rotate = Math.random() * 720 - 360;
+    const duration = DURATION_MIN + Math.random() * (DURATION_MAX - DURATION_MIN);
+
+    el.animate(
+      [
+        { transform: `translate(-50%, 0) scale(${scale}) rotate(0deg)`, opacity: 0.95 },
+        { transform: `translate(calc(-50% + ${drift}px), 120vh) scale(${scale}) rotate(${rotate}deg)`, opacity: 0.95 },
+        { transform: `translate(calc(-50% + ${drift}px), 140vh) scale(${scale}) rotate(${rotate}deg)`, opacity: 0 },
+      ],
+      { duration, easing: "ease-in", fill: "forwards" }
+    );
+
+    setTimeout(() => el.remove(), duration + 50);
+  }
+
+  setTimeout(clearFx, DURATION_MAX + 400);
 }
 
 function clearFx() {
