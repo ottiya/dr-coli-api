@@ -1,0 +1,76 @@
+{
+  "id": "episode-01",
+  "title": "안녕하세요! 안녕!",
+  "background": "puppy-playground",
+  "scenes": [
+    {
+      "id": "welcome",
+      "drColi": {
+        "say": [
+          "Hello, dear friends! My name is Dr. Coli.",
+          "I’ll be teaching you Korean.",
+          "You can also call me Coli 선생님.",
+          "선생님 means teacher in Korean.",
+          "선생님, 선생님. Can you try to say it with me?"
+        ],
+        "animation": "talk"
+      },
+      "bori": { "animation": "look" },
+      "interaction": { "type": "mic_optional" }
+    },
+
+    {
+      "id": "meet-bori",
+      "drColi": {
+        "say": [
+          "And this is my friend Bori.",
+          "Bori is a puppy."
+        ],
+        "animation": "idle"
+      },
+      "bori": { "animation": "wave" },
+      "interaction": {
+        "type": "emoji",
+        "options": ["😊", "👋"]
+      }
+    },
+
+    {
+      "id": "annyeonghaseyo",
+      "drColi": {
+        "say": [
+          "In Korean, when we meet adults, we say 안녕하세요.",
+          "When we say 안녕하세요, we do a little bow."
+        ],
+        "animation": "bow"
+      },
+      "bori": { "animation": "bow" },
+      "interaction": {
+        "type": "repeat",
+        "target": "안녕하세요"
+      }
+    },
+
+    {
+      "id": "annyeong",
+      "drColi": {
+        "say": [
+          "When you see your friends or Bori, you can say 안녕.",
+          "And when we say 안녕, we wave!"
+        ],
+        "animation": "wave"
+      },
+      "bori": { "animation": "wave" },
+      "interaction": {
+        "type": "repeat",
+        "target": "안녕"
+      }
+    },
+
+    {
+      "id": "song",
+      "type": "song",
+      "audio": "annyeong-song.mp3"
+    }
+  ]
+}
