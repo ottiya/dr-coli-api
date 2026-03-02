@@ -1,4 +1,4 @@
-/* public/v2/v2.js — Episode engine + ElevenLabs TTS + STT mic checking */
+/* public/v2/v2.js — Episode engine + ElevenLabs TTS + STT mic checking (with voiced success/fail) */
 
 let currentSceneIndex = 0;
 let episodeData = null;
@@ -118,31 +118,6 @@ async function preGenerateRemainingScenes(ep) {
   }
 }
 
-/* ===== Scene engine ===== */
-function playScene(index) {
-  currentSceneIndex = index;
-
-  if (!episodeData?.scenes?.[index]) {
-    endEpisode();
-    return;
-  }
-
-  const scene = episodeData.scenes[index];
-
-  hideEmojiTray();
-  hideMic();
-  clearFx();
-
-  setBackground(scene.background || "/assets/backgrounds/bg-puppies.png");
-
-  const lines = scene?.drColi?.say || [];
-  const urls = scene?._audioUrls || [];
-
-  playDialogueWithAudio(lines, urls, () => {
-    enableInteraction(scene.interaction || { type: "none" });
-  });
-}
-
 /* ===== Dialogue + audio ===== */
 function showDialogue(text) {
   dialogueEl.classList.add("active");
@@ -175,6 +150,54 @@ function playTtsUrl(url) {
     ttsAudio.onerror = cleanup;
 
     ttsAudio.play().catch(cleanup);
+  });
+}
+
+async function sayLine(line) {
+  const text = String(line || "").trim();
+  if (!text) return;
+
+  showDialogue(text);
+
+  const url = await getElevenLabsTtsUrl(text);
+  if (url) {
+    await playTtsUrl(url);
+    await sleep(140);
+  } else {
+    await sleep(Math.max(700, Math.min(1600, text.length * 28)));
+  }
+}
+
+// Speak multiple lines (array) with TTS
+async function sayLines(lines) {
+  if (!Array.isArray(lines) || lines.length === 0) return;
+  for (const line of lines) {
+    await sayLine(line);
+  }
+}
+
+/* ===== Scene engine ===== */
+function playScene(index) {
+  currentSceneIndex = index;
+
+  if (!episodeData?.scenes?.[index]) {
+    endEpisode();
+    return;
+  }
+
+  const scene = episodeData.scenes[index];
+
+  hideEmojiTray();
+  hideMic();
+  clearFx();
+
+  setBackground(scene.background || "/assets/backgrounds/bg-puppies.png");
+
+  const lines = scene?.drColi?.say || [];
+  const urls = scene?._audioUrls || [];
+
+  playDialogueWithAudio(lines, urls, () => {
+    enableInteraction(scene.interaction || { type: "none" });
   });
 }
 
@@ -220,13 +243,15 @@ function enableInteraction(interaction) {
   if (interaction.type === "emoji") {
     showEmojiTray(
       interaction.choices || ["🙇‍♀️", "👋", "🏃‍♀️"],
-      interaction.correctIndex ?? 0
+      interaction.correctIndex ?? 0,
+      interaction.onCorrectSay || null,
+      interaction.onWrongSay || null
     );
     return;
   }
 
   if (interaction.type === "mic") {
-    showMic(interaction.target || "");
+    showMic(interaction);
     return;
   }
 
@@ -234,21 +259,32 @@ function enableInteraction(interaction) {
 }
 
 /* ===== Emoji tray ===== */
-function showEmojiTray(choices, correctIndex) {
+function showEmojiTray(choices, correctIndex, onCorrectSay, onWrongSay) {
   emojiTrayEl.classList.add("active");
 
   emojiButtons.forEach((btn, idx) => {
     btn.textContent = choices?.[idx] || "";
-    btn.onclick = () => {
+    btn.onclick = async () => {
       if (idx === correctIndex) {
         confettiFullScreen();
-        showDialogue("Yes! Great job!");
-        setTimeout(() => {
-          hideEmojiTray();
-          playScene(currentSceneIndex + 1);
-        }, 900);
+        hideEmojiTray();
+
+        if (Array.isArray(onCorrectSay) && onCorrectSay.length) {
+          await sayLines(onCorrectSay);
+        } else {
+          await sayLine("Yes! Great job!");
+        }
+
+        setTimeout(() => playScene(currentSceneIndex + 1), 200);
       } else {
-        showDialogue("Nice try! Try again!");
+        if (Array.isArray(onWrongSay) && onWrongSay.length) {
+          await sayLines(onWrongSay);
+        } else {
+          await sayLine("Nice try! Try again!");
+        }
+
+        // keep tray open for retry
+        emojiTrayEl.classList.add("active");
       }
     };
   });
@@ -260,45 +296,62 @@ function hideEmojiTray() {
 }
 
 /* ===== Mic + STT ===== */
-function showMic(targetKorean) {
+function showMic(interaction) {
+  const targetKorean = interaction?.target || "";
+  const prompt = interaction?.prompt || "Tap the mic, then say it!";
+
   micButtonEl.classList.remove("hidden");
   micButtonEl.onclick = async () => {
     micButtonEl.onclick = null;
 
+    // show prompt first (so kids know what to do)
+    showDialogue(prompt);
+    await sleep(250);
+
     showDialogue("I’m listening… 🎤");
-micButtonEl.classList.add("listening");
+    micButtonEl.classList.add("listening");
+
     const transcript = await recordAndTranscribeOnce();
+
     micButtonEl.classList.remove("listening");
 
     if (!transcript) {
-      showDialogue("I couldn’t hear that—try again! 🎤");
-      micButtonEl.onclick = () => showMic(targetKorean);
+      // voiced retry
+      await sayLine("I couldn’t hear that—try again!");
       micButtonEl.classList.remove("hidden");
+      micButtonEl.onclick = () => showMic(interaction);
       return;
     }
 
     const heard = transcript.trim();
     const ok = isForgivingMatch(heard, targetKorean);
 
-    // show what we heard (helps debugging + kids love it)
+    // show what we heard (debug + fun)
     showDialogue(`I heard: “${heard}”`);
+    await sleep(250);
 
     if (ok) {
       confettiFullScreen();
-      setTimeout(() => {
-        showDialogue("Yes!! Amazing job! ⭐");
-      }, 350);
 
-      setTimeout(() => {
-        hideMic();
-        playScene(currentSceneIndex + 1);
-      }, 1200);
+      // VOICED success
+      const successLines =
+        interaction?.onSuccessSay ||
+        ["Yes!! Amazing job! ⭐"];
+
+      await sayLines(successLines);
+
+      hideMic();
+      setTimeout(() => playScene(currentSceneIndex + 1), 200);
     } else {
-      setTimeout(() => {
-        showDialogue("So close! Let’s try together one more time.");
-        micButtonEl.classList.remove("hidden");
-        micButtonEl.onclick = () => showMic(targetKorean);
-      }, 900);
+      // VOICED gentle retry
+      const failLines =
+        interaction?.onFailSay ||
+        ["So close! Let’s try together one more time."];
+
+      await sayLines(failLines);
+
+      micButtonEl.classList.remove("hidden");
+      micButtonEl.onclick = () => showMic(interaction);
     }
   };
 }
@@ -324,13 +377,11 @@ async function recordAndTranscribeOnce() {
 
     recorder.start();
 
-    // record a short burst (kid phrase)
     await sleep(2200);
     recorder.stop();
 
     await stopped;
 
-    // stop mic
     stream.getTracks().forEach((t) => t.stop());
 
     const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
@@ -339,8 +390,8 @@ async function recordAndTranscribeOnce() {
     const file = new File([blob], "speech.webm", { type: blob.type });
 
     const form = new FormData();
-    form.append("file", file);                 // OpenAI expects "file" in multipart
-    form.append("model", "gpt-4o-mini-transcribe"); // fast+good :contentReference[oaicite:3]{index=3}
+    form.append("file", file);
+    form.append("model", "gpt-4o-mini-transcribe");
     form.append("language", "ko");
 
     const res = await fetch("/api/stt", { method: "POST", body: form });
@@ -372,21 +423,17 @@ function pickRecorderMimeType() {
 }
 
 /* ===== Forgiving matching ===== */
-
-// normalize Korean text for comparison
 function normalizeKo(s) {
   return String(s || "")
     .toLowerCase()
     .replace(/\s+/g, "")
     .replace(/[.,!?~'"“”‘’]/g, "")
     .replace(/-/g, "")
-    // common ASR-ish variants that show up with kids
     .replace(/세이요/g, "세요")
     .replace(/하세용/g, "하세요")
     .replace(/하세여/g, "하세요");
 }
 
-// collapse repeats like "안녕하세요안녕하세요" -> "안녕하세요"
 function collapseRepeats(norm, targetNorm) {
   if (!targetNorm) return norm;
   while (norm.includes(targetNorm + targetNorm)) {
@@ -395,7 +442,6 @@ function collapseRepeats(norm, targetNorm) {
   return norm;
 }
 
-// Levenshtein distance (small + fast)
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   if (m === 0) return n;
@@ -417,7 +463,6 @@ function levenshtein(a, b) {
   return dp[n];
 }
 
-// forgiving match for Korean target phrases
 function isForgivingMatch(heardRaw, targetRaw) {
   const target = normalizeKo(targetRaw);
   if (!target) return true;
@@ -425,17 +470,14 @@ function isForgivingMatch(heardRaw, targetRaw) {
   let heard = normalizeKo(heardRaw);
   heard = collapseRepeats(heard, target);
 
-  // 1) perfect or contains (handles extra words)
   if (heard === target) return true;
   if (heard.includes(target)) return true;
 
-  // 2) allow a small edit distance (kids speech / ASR quirks)
   const d = levenshtein(heard, target);
 
-  // very short targets need stricter matching
-  if (target.length <= 2) return d <= 0; // e.g., "안녕" shouldn’t accept too much
+  if (target.length <= 2) return d <= 0;
   if (target.length <= 4) return d <= 1;
-  return d <= 2; // "안녕하세요" forgiving
+  return d <= 2;
 }
 
 /* ===== Confetti ===== */
