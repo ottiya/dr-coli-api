@@ -1,271 +1,280 @@
-// v2.js
+/* v2.js — episode engine + full-screen confetti */
 
 let currentSceneIndex = 0;
 let episodeData = null;
 
-document.addEventListener('DOMContentLoaded', () => {
-  setBackground('bg-puppies.png');
+// Cache DOM
+const bgLayer = document.getElementById('bgLayer');
 
-  fetch('/lessons/episode-01.json')
-    .then((res) => {
-      if (!res.ok) throw new Error(`Failed to load episode JSON: ${res.status}`);
-      return res.json();
-    })
-    .then((data) => {
-      episodeData = data;
-      if (episodeData.background) setBackground(episodeData.background);
-      playScene(0);
-    })
-    .catch((err) => console.error(err));
-});
+const dialogue = document.getElementById('dialogue');
+const dialogueText = document.getElementById('dialogueText');
+
+const emojiTray = document.getElementById('emojiTray');
+const emojiSlots = Array.from(document.querySelectorAll('.emoji-slot'));
+
+const micButton = document.getElementById('micButton');
+const fxLayer = document.getElementById('fxLayer');
+
+// Confetti assets you already have
+const CONFETTI_ASSETS = [
+  '/assets/ui/confetti-blue-ribbon.png',
+  '/assets/ui/confetti-golden-ribbon.png',
+  '/assets/ui/confetti-green-ribbon.png',
+  '/assets/ui/confetti-pink-twirl.png',
+  '/assets/ui/confetti-star.png',
+];
+
+// Load episode JSON
+fetch('/lessons/episode-01.json')
+  .then(res => {
+    if (!res.ok) throw new Error(`Failed to load episode JSON: ${res.status}`);
+    return res.json();
+  })
+  .then(data => {
+    episodeData = data;
+    playScene(0);
+  })
+  .catch(err => console.error(err));
 
 function playScene(index) {
   currentSceneIndex = index;
 
-  if (!episodeData?.scenes?.[index]) {
-    console.warn('No more scenes or scene not found:', index);
-    hideAllUI();
+  if (!episodeData || !episodeData.scenes || !episodeData.scenes[index]) {
+    console.error('Scene not found:', index);
     return;
   }
 
-  hideAllUI();
-
   const scene = episodeData.scenes[index];
 
-  if (scene.background) setBackground(scene.background);
-  else if (episodeData.background) setBackground(episodeData.background);
+  // Reset UI each scene
+  hideEmojiTray();
+  hideMic();
+  clearFX();
 
-  setDrColi(scene.drColi?.animation || 'idle');
-  setBori(scene.bori?.animation || 'idle');
+  // Background
+  setBackground(scene.background || 'bg-puppies.png');
 
+  // Dialogue lines
   const lines = scene.drColi?.say || [];
   playDialogue(lines, () => {
     enableInteraction(scene.interaction || { type: 'none' });
   });
 }
 
+/* =========================
+   Background
+========================= */
+function setBackground(bgFile) {
+  // allow passing full filename or just "bg-puppies.png"
+  const path = bgFile.startsWith('/assets/')
+    ? bgFile
+    : `/assets/backgrounds/${bgFile}`;
+
+  bgLayer.style.backgroundImage = `url("${path}")`;
+}
+
+/* =========================
+   Dialogue
+========================= */
+function playDialogue(lines, done) {
+  if (!lines || lines.length === 0) {
+    hideDialogue();
+    done?.();
+    return;
+  }
+
+  showDialogue();
+  let i = 0;
+
+  const advance = () => {
+    if (i >= lines.length) {
+      // short beat before interaction shows
+      setTimeout(() => done?.(), 250);
+      return;
+    }
+
+    dialogueText.textContent = lines[i];
+    i += 1;
+
+    // Auto-advance timing: tweak as needed
+    setTimeout(advance, 1400);
+  };
+
+  advance();
+}
+
+function showDialogue() {
+  dialogue.classList.add('active');
+}
+function hideDialogue() {
+  dialogue.classList.remove('active');
+}
+
+/* =========================
+   Interaction routing
+========================= */
 function enableInteraction(interaction) {
   if (!interaction || interaction.type === 'none') {
+    // auto-advance
     setTimeout(() => playScene(currentSceneIndex + 1), 700);
     return;
   }
 
   if (interaction.type === 'emoji') {
-    runEmojiInteraction(interaction);
+    showEmojiTray(interaction);
     return;
   }
 
   if (interaction.type === 'mic') {
-    runMicInteraction(interaction);
+    showMic(interaction);
     return;
   }
 
-  console.log('Unknown interaction:', interaction);
+  // fallback
   setTimeout(() => playScene(currentSceneIndex + 1), 700);
 }
 
-/* ---------- Dialogue ---------- */
-function playDialogue(lines, onDone) {
-  const dialogueEl = document.getElementById('dialogue');
-  const textEl = document.getElementById('dialogueText');
+/* =========================
+   Emoji Tray
+========================= */
+function showEmojiTray(interaction) {
+  emojiTray.classList.add('active');
+  emojiTray.setAttribute('aria-hidden', 'false');
 
-  if (!dialogueEl || !textEl) {
-    console.warn('Dialogue UI missing (#dialogue / #dialogueText).');
-    onDone?.();
-    return;
-  }
+  const choices = interaction.choices || ['🙇‍♀️', '👋', '🏃‍♀️'];
+  const correctIndex = typeof interaction.correctIndex === 'number' ? interaction.correctIndex : 0;
 
-  if (!lines.length) {
-    dialogueEl.classList.remove('active');
-    onDone?.();
-    return;
-  }
-
-  dialogueEl.classList.add('active');
-
-  let i = 0;
-  const next = () => {
-    if (i >= lines.length) {
-      setTimeout(() => {
-        dialogueEl.classList.remove('active');
-        onDone?.();
-      }, 250);
-      return;
-    }
-
-    textEl.textContent = lines[i];
-    i += 1;
-
-    // Placeholder timing (later: audio length)
-    setTimeout(next, 1200);
-  };
-
-  next();
-}
-
-/* ---------- Emoji Interaction ---------- */
-function runEmojiInteraction(interaction) {
-  const tray = document.getElementById('emojiTray');
-  const slots = Array.from(document.querySelectorAll('.emoji-slot'));
-
-  if (!tray || slots.length !== 3) {
-    console.warn('Emoji tray UI missing');
-    setTimeout(() => playScene(currentSceneIndex + 1), 700);
-    return;
-  }
-
-  const choices = interaction.choices || ['🙂', '🙂', '🙂'];
-  slots.forEach((btn, idx) => {
-    btn.textContent = choices[idx] || '';
+  // Fill slots
+  emojiSlots.forEach((btn, idx) => {
+    btn.textContent = choices[idx] ?? '';
     btn.disabled = false;
+
+    // clear old listeners (safe pattern)
     btn.onclick = null;
-  });
-
-  tray.classList.remove('hidden');
-  tray.classList.add('active');
-  tray.setAttribute('aria-hidden', 'false');
-
-  const correctIndex = Number(interaction.correctIndex ?? 0);
-
-  const lockButtons = () => slots.forEach((b) => (b.disabled = true));
-  const unlockButtons = () => slots.forEach((b) => (b.disabled = false));
-
-  slots.forEach((btn, idx) => {
-    btn.onclick = () => {
-      lockButtons();
-
-      if (idx === correctIndex) {
-        confettiBurstFullScreen();
-
-        const lines = interaction.onCorrectSay || ['Great job!'];
-        playDialogue(lines, () => {
-          hideEmojiTray();
-          setTimeout(() => playScene(currentSceneIndex + 1), 600);
-        });
-      } else {
-        const lines = interaction.onWrongSay || ['Nice try! Let’s try again.'];
-        playDialogue(lines, () => {
-          unlockButtons();
-        });
-      }
-    };
+    btn.onclick = () => handleEmojiPick(idx, correctIndex, interaction);
   });
 }
 
 function hideEmojiTray() {
-  const tray = document.getElementById('emojiTray');
-  if (!tray) return;
-
-  tray.classList.remove('active');
-  tray.setAttribute('aria-hidden', 'true');
-  setTimeout(() => tray.classList.add('hidden'), 250);
+  emojiTray.classList.remove('active');
+  emojiTray.setAttribute('aria-hidden', 'true');
+  emojiSlots.forEach(btn => {
+    btn.onclick = null;
+    btn.disabled = true;
+    btn.textContent = '';
+  });
 }
 
-/* ---------- Mic Interaction (placeholder) ---------- */
-function runMicInteraction(interaction) {
-  const mic = document.getElementById('micButton');
-  if (!mic) {
-    setTimeout(() => playScene(currentSceneIndex + 1), 700);
-    return;
+function handleEmojiPick(pickedIdx, correctIdx, interaction) {
+  // lock
+  emojiSlots.forEach(b => (b.disabled = true));
+
+  if (pickedIdx === correctIdx) {
+    // ✅ success feedback
+    playConfettiFullScreen();
+
+    // If you want to also change dialogue line on success:
+    const praise = interaction.praise || 'Yes! Great job!';
+    showDialogue();
+    dialogueText.textContent = praise;
+
+    // Give kids time to see confetti + hear praise
+    setTimeout(() => {
+      hideEmojiTray();
+      playScene(currentSceneIndex + 1);
+    }, 1600);
+
+  } else {
+    // ❌ gentle retry
+    const retry = interaction.retry || 'Nice try! Let’s try again.';
+    showDialogue();
+    dialogueText.textContent = retry;
+
+    setTimeout(() => {
+      // re-enable for retry
+      emojiSlots.forEach(b => (b.disabled = false));
+    }, 600);
   }
+}
 
-  mic.classList.remove('hidden');
+/* =========================
+   Mic
+========================= */
+function showMic(interaction) {
+  micButton.classList.remove('hidden');
 
-  if (interaction.prompt) {
-    playDialogue([interaction.prompt], () => {});
-  }
-
-  mic.onclick = () => {
-    mic.classList.add('hidden');
-    mic.onclick = null;
-    setTimeout(() => playScene(currentSceneIndex + 1), 400);
+  micButton.onclick = null;
+  micButton.onclick = () => {
+    micButton.classList.add('hidden');
+    micButton.onclick = null;
+    // advance
+    setTimeout(() => playScene(currentSceneIndex + 1), 250);
   };
 }
 
-/* ---------- Confetti (FULL SCREEN + SLOWER) ---------- */
-function confettiBurstFullScreen() {
-  const fx = document.getElementById('fxLayer');
-  const viewport = document.getElementById('viewport');
-  if (!fx || !viewport) return;
+function hideMic() {
+  micButton.classList.add('hidden');
+  micButton.onclick = null;
+}
 
-  const w = viewport.clientWidth;
-  const h = viewport.clientHeight;
+/* =========================
+   Full-screen confetti
+========================= */
+function playConfettiFullScreen() {
+  // Create a burst container that covers the whole viewport
+  const burst = document.createElement('div');
+  burst.className = 'confetti-burst';
 
-  const confettiFiles = [
-    '/assets/ui/confetti-star.png',
-    '/assets/ui/confetti-blue-ribbon.png',
-    '/assets/ui/confetti-golden-ribbon.png',
-    '/assets/ui/confetti-green-ribbon.png',
-    '/assets/ui/confetti-pink-twirl.png'
-  ];
+  // number of pieces
+  const N = 28;
 
-  const count = 48; // more = more “celebration”
-
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < N; i++) {
     const img = document.createElement('img');
-    img.src = confettiFiles[i % confettiFiles.length];
+    img.className = 'confetti-piece';
+    img.alt = '';
 
-    const startX = Math.random() * w;
-    const startY = -60 - Math.random() * 160;
+    // random asset
+    const src = CONFETTI_ASSETS[Math.floor(Math.random() * CONFETTI_ASSETS.length)];
+    img.src = src;
 
-    const size = 20 + Math.random() * 38;
-    img.style.position = 'absolute';
-    img.style.left = `${startX}px`;
-    img.style.top = `${startY}px`;
-    img.style.width = `${size}px`;
-    img.style.height = 'auto';
-    img.style.opacity = '1';
-    img.style.pointerEvents = 'none';
+    // spread across entire width
+    const x = Math.random() * 100;
 
-    fx.appendChild(img);
+    // random size
+    const size = 28 + Math.random() * 34; // 28..62 px
 
-    const driftX = (Math.random() - 0.5) * 320;
-    const endY = h + 160 + Math.random() * 220;
+    // random delay so it feels alive (still short)
+    const delay = Math.random() * 250; // 0..250ms
 
-    const rot0 = Math.random() * 360;
-    const rot1 = rot0 + (Math.random() - 0.5) * 1400;
+    // slower duration
+    const dur = 1700 + Math.random() * 600; // 1700..2300ms
 
-    const dur = 2400 + Math.random() * 800; // 2.4–3.2s
+    img.style.left = `${x}%`;
+    img.style.setProperty('--size', `${size}px`);
+    img.style.setProperty('--delay', `${Math.round(delay)}ms`);
+    img.style.setProperty('--dur', `${Math.round(dur)}ms`);
 
-    img.animate(
-      [
-        { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: 1 },
-        { transform: `translate(${driftX}px, ${endY * 0.65}px) rotate(${rot1 * 0.7}deg)`, opacity: 1 },
-        { transform: `translate(${driftX * 1.15}px, ${endY}px) rotate(${rot1}deg)`, opacity: 0 }
-      ],
-      {
-        duration: dur,
-        easing: 'cubic-bezier(.15,.85,.25,1)',
-        fill: 'forwards'
-      }
-    );
-
-    setTimeout(() => img.remove(), dur + 200);
-  }
-}
-
-/* ---------- Helpers ---------- */
-function hideAllUI() {
-  const tray = document.getElementById('emojiTray');
-  if (tray) {
-    tray.classList.remove('active');
-    tray.classList.add('hidden');
-    tray.setAttribute('aria-hidden', 'true');
+    burst.appendChild(img);
   }
 
-  const mic = document.getElementById('micButton');
-  if (mic) {
-    mic.classList.add('hidden');
-    mic.onclick = null;
-  }
+  fxLayer.appendChild(burst);
+
+  // remove after max duration
+  setTimeout(() => {
+    burst.remove();
+  }, 2600);
 }
 
-function setBackground(filename) {
-  const bgLayer = document.getElementById('bgLayer');
-  if (!bgLayer) return;
-  bgLayer.style.backgroundImage = `url("/assets/backgrounds/${filename}")`;
+function clearFX() {
+  fxLayer.innerHTML = '';
 }
 
-// Sprite engine hooks (stubs for now)
-function setDrColi(state) {}
-function setBori(state) {}
+/* =========================
+   Optional: click to advance (debug helper)
+   Uncomment if you want tap-to-skip while testing
+========================= */
+// document.getElementById('viewport').addEventListener('click', (e) => {
+//   // avoid clicking on emoji buttons/mic
+//   if (e.target.closest('.emoji-tray') || e.target.closest('.mic')) return;
+//   playScene(currentSceneIndex + 1);
+// });
