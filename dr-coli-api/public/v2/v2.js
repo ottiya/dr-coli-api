@@ -1,8 +1,7 @@
 /* public/v2/v2.js */
-/* Pixi v7-safe + guarded against double-boot */
+/* Pixi v7-safe + guarded against double-boot + non-fatal spritesheet loading */
 
 (() => {
-  // Guard: if the script accidentally gets included twice, do nothing the second time.
   if (window.__DRCOLI_V2_BOOTED__) return;
   window.__DRCOLI_V2_BOOTED__ = true;
 
@@ -22,21 +21,10 @@
   let drColiSprite = null;
   let boriSprite = null;
 
-  // Cache: character -> state -> textures[]
-  const textureCache = {
-    drColi: {},
-    bori: {}
-  };
+  const textureCache = { drColi: {}, bori: {} };
+  const charState = { drColi: "idle", bori: "idle" };
 
-  // Track current states so we can restore after celebrations
-  const charState = {
-    drColi: "idle",
-    bori: "idle"
-  };
-
-  // ===== Boot =====
   document.addEventListener("DOMContentLoaded", () => {
-    // DOM refs
     bgLayer = document.getElementById("bgLayer");
     dialogueEl = document.getElementById("dialogue");
     dialogueTextEl = document.getElementById("dialogueText");
@@ -54,33 +42,23 @@
   });
 
   async function boot() {
-    // Default bg immediately (prevents black screen)
     setBackground(DEFAULT_BG);
-
-    // Init Pixi stage
     initPixi();
 
-    // Ensure Assets system is ready (Pixi v7)
     if (PIXI.Assets?.init) {
-      // Safe to call multiple times; Pixi ignores repeats.
       await PIXI.Assets.init({ manifest: null }).catch(() => {});
     }
 
-    // Load character textures (Pixi v7 Assets flow)
+    // Load character textures but do NOT hard-fail if some sheets are missing
     const manifest = await fetchJSON(CHARACTER_MANIFEST_URL);
     await loadCharacterTextures(manifest);
 
-    // Create character sprites
     createCharacters();
 
-    // Load episode
     episodeData = await fetchJSON(EPISODE_URL);
-
-    // Start
     playScene(0);
   }
 
-  // ===== Helpers =====
   async function fetchJSON(url) {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
@@ -104,26 +82,26 @@
     });
 
     stageLayerEl.appendChild(pixiApp.view);
-
-    window.addEventListener("resize", () => {
-      positionCharacters();
-    });
+    window.addEventListener("resize", positionCharacters);
   }
 
-  // ===== Load sprite sheets from manifest (Pixi v7 Assets) =====
+  // ===== Loading textures (non-fatal) =====
   async function loadCharacterTextures(manifest) {
-    await loadCharacterFromManifest("drColi", manifest.drColi);
-    await loadCharacterFromManifest("bori", manifest.bori);
+    await loadCharacterFromManifest("drColi", manifest?.drColi);
+    await loadCharacterFromManifest("bori", manifest?.bori);
   }
 
   async function loadCharacterFromManifest(characterKey, statesObj) {
-    if (!statesObj) return;
+    if (!statesObj) {
+      console.warn(`[manifest] Missing states for ${characterKey}`);
+      return;
+    }
 
     for (const [stateName, jsonUrls] of Object.entries(statesObj)) {
       const textures = [];
 
       for (const jsonUrl of (jsonUrls || [])) {
-        const sheetTextures = await loadSpritesheetTextures(jsonUrl);
+        const sheetTextures = await loadSpritesheetTexturesSafe(jsonUrl, `${characterKey}.${stateName}`);
         textures.push(...sheetTextures);
       }
 
@@ -131,23 +109,27 @@
     }
   }
 
-  async function loadSpritesheetTextures(jsonUrl) {
-    // Pixi v7: load spritesheet JSON via Assets
-    // Depending on how Pixi resolves it, this can return a Spritesheet, or an object containing one.
-    const loaded = await PIXI.Assets.load(jsonUrl);
+  async function loadSpritesheetTexturesSafe(jsonUrl, label) {
+    try {
+      const loaded = await PIXI.Assets.load(jsonUrl);
 
-    const sheet =
-      loaded?.textures ? loaded :
-      loaded?.spritesheet?.textures ? loaded.spritesheet :
-      null;
+      const sheet =
+        loaded?.textures ? loaded :
+        loaded?.spritesheet?.textures ? loaded.spritesheet :
+        null;
 
-    if (!sheet || !sheet.textures) {
-      throw new Error(`No spritesheet/textures found in: ${jsonUrl}`);
+      if (!sheet || !sheet.textures) {
+        console.warn(`[sheet] No textures found for ${label}: ${jsonUrl}`);
+        return [];
+      }
+
+      const keys = Object.keys(sheet.textures).sort();
+      return keys.map(k => sheet.textures[k]);
+    } catch (err) {
+      // This is where your current 404 ends up.
+      console.error(`[sheet] Failed to load ${label}: ${jsonUrl}`, err);
+      return [];
     }
-
-    // Stable frame order
-    const keys = Object.keys(sheet.textures).sort();
-    return keys.map(k => sheet.textures[k]);
   }
 
   // ===== Create & place characters =====
@@ -155,17 +137,13 @@
     const drIdle = textureCache.drColi.idle || [];
     const boriIdle = textureCache.bori.idle || [];
 
-    if (!drIdle.length) console.warn("Dr. Coli idle textures missing");
-    if (!boriIdle.length) console.warn("Bori idle textures missing");
-
+    // If missing, still create sprite so stage renders
     drColiSprite = new PIXI.AnimatedSprite(drIdle.length ? drIdle : [PIXI.Texture.WHITE]);
     boriSprite = new PIXI.AnimatedSprite(boriIdle.length ? boriIdle : [PIXI.Texture.WHITE]);
 
-    // Anchor bottom-center for easy ground placement
     drColiSprite.anchor.set(0.5, 1);
     boriSprite.anchor.set(0.5, 1);
 
-    // Sizing: tweak to taste
     drColiSprite.scale.set(0.55);
     boriSprite.scale.set(0.55);
 
@@ -174,7 +152,6 @@
 
     positionCharacters();
 
-    // Start idle ping-pong
     setDrColi("idle");
     setBori("idle");
   }
@@ -184,7 +161,6 @@
 
     const w = pixiApp.renderer.width;
     const h = pixiApp.renderer.height;
-
     const groundY = h - 40;
 
     drColiSprite.x = w * 0.25;
@@ -194,47 +170,41 @@
     boriSprite.y = groundY;
   }
 
-  // ===== Character state setters (with ping-pong option) =====
   function setDrColi(state, opts = {}) {
     charState.drColi = state;
-    playCharacterState(drColiSprite, textureCache.drColi[state], {
-      pingpong: shouldPingPong(state),
-      ...opts
-    });
+    playCharacterState(drColiSprite, textureCache.drColi[state], { pingpong: shouldPingPong(state), ...opts });
   }
 
   function setBori(state, opts = {}) {
     charState.bori = state;
-    playCharacterState(boriSprite, textureCache.bori[state], {
-      pingpong: shouldPingPong(state),
-      ...opts
-    });
+    playCharacterState(boriSprite, textureCache.bori[state], { pingpong: shouldPingPong(state), ...opts });
   }
 
   function shouldPingPong(state) {
-    // Smooth “breathing” states
     return state === "idle" || state === "look" || state === "talk";
   }
 
   function playCharacterState(sprite, textures, { pingpong = false, once = false, speed = 0.12 } = {}) {
-    if (!sprite || !textures || textures.length === 0) return;
+    if (!sprite) return;
+
+    if (!textures || textures.length === 0) {
+      // Keep whatever it currently has (or WHITE)
+      sprite.animationSpeed = 0;
+      sprite.stop();
+      return;
+    }
 
     sprite.textures = textures;
     sprite.animationSpeed = Math.abs(speed);
 
     if (pingpong && textures.length > 1) {
-      // Ping-pong by flipping direction at ends
       sprite.loop = false;
       sprite.gotoAndPlay(0);
 
       sprite.onComplete = () => {
         sprite.animationSpeed *= -1;
-
-        if (sprite.currentFrame === textures.length - 1) {
-          sprite.gotoAndPlay(textures.length - 1);
-        } else {
-          sprite.gotoAndPlay(0);
-        }
+        if (sprite.currentFrame === textures.length - 1) sprite.gotoAndPlay(textures.length - 1);
+        else sprite.gotoAndPlay(0);
       };
     } else {
       sprite.onComplete = null;
@@ -247,44 +217,32 @@
   function playScene(index) {
     currentSceneIndex = index;
 
-    if (!episodeData || !episodeData.scenes || !episodeData.scenes[index]) {
+    if (!episodeData?.scenes?.[index]) {
       console.log("Episode finished or scene missing:", index);
       return;
     }
 
     const scene = episodeData.scenes[index];
 
-    // Background: scene override or episode default
     setBackground(scene.background || episodeData.background || DEFAULT_BG);
 
-    // Character logic rules
     const drAnim = scene.drColi?.animation || "idle";
     const boriAnim = scene.bori?.animation || null;
 
-    // If either is bow => both bow
     if (drAnim === "bow" || boriAnim === "bow") {
       setDrColi("bow", { speed: 0.12 });
       setBori("bow", { speed: 0.12 });
     } else {
       setDrColi(drAnim);
 
-      if (boriAnim) {
-        setBori(boriAnim);
-      } else {
-        // Dr wave => Bori calm idle; otherwise Bori looks
-        if (drAnim === "wave") setBori("idle");
-        else setBori("look");
-      }
+      if (boriAnim) setBori(boriAnim);
+      else setBori(drAnim === "wave" ? "idle" : "look");
     }
 
-    // Dialogue
     const lines = scene.drColi?.say || [];
-    playDialogue(lines, () => {
-      enableInteraction(scene.interaction || { type: "none" });
-    });
+    playDialogue(lines, () => enableInteraction(scene.interaction || { type: "none" }));
   }
 
-  // ===== Dialogue =====
   async function playDialogue(lines, done) {
     if (!lines || lines.length === 0) {
       dialogueEl.classList.remove("active");
@@ -307,7 +265,6 @@
     return new Promise(r => setTimeout(r, ms));
   }
 
-  // ===== TTS hook (ElevenLabs implementation) =====
   async function speakLine(text) {
     try {
       const res = await fetch("/api/tts-elevenlabs", {
@@ -326,10 +283,9 @@
       if (!url) return;
 
       const audio = new Audio(url);
-      audio.playbackRate = 1.1; // slightly faster (tweak this if needed)
+      audio.playbackRate = 1.1;
       await audio.play();
 
-      // await playback fully
       await new Promise(resolve => {
         audio.onended = () => resolve();
         audio.onerror = () => resolve();
@@ -339,11 +295,9 @@
     }
   }
 
-  // ===== Interactions =====
   function enableInteraction(interaction) {
     const type = interaction?.type || "none";
 
-    // reset UI
     emojiTrayEl.classList.add("hidden");
     emojiTrayEl.classList.remove("active");
     micButtonEl.classList.add("hidden");
@@ -359,7 +313,6 @@
     setTimeout(() => playScene(currentSceneIndex + 1), 500);
   }
 
-  // ===== Emoji interaction =====
   function showEmojiInteraction(interaction) {
     const choices = interaction.choices || [];
     const correctIndex = interaction.correctIndex ?? 0;
@@ -379,10 +332,8 @@
             playScene(currentSceneIndex + 1);
           }, 300);
         } else {
-          // Wrong answer -> calm down / reset
           setDrColi("idle");
           setBori("idle");
-
           const msg = interaction.onWrongSay?.[0] || "So close! Let’s try again.";
           await speakLine(msg);
         }
@@ -390,7 +341,6 @@
     });
   }
 
-  // ===== Mic interaction (tap-to-continue for now) =====
   function showMicInteraction(interaction) {
     micButtonEl.classList.remove("hidden");
     micButtonEl.onclick = async () => {
@@ -399,7 +349,6 @@
     };
   }
 
-  // ===== Celebration =====
   async function celebrateCorrect(praiseLine) {
     const prevDr = charState.drColi;
     const prevBori = charState.bori;
@@ -408,14 +357,12 @@
     setBori("wave", { speed: 0.14 });
 
     spawnFullScreenConfetti();
-
     await speakLine(praiseLine);
 
     setDrColi(prevDr);
     setBori(prevBori);
   }
 
-  // Placeholder (keep your existing confetti if already implemented elsewhere)
   function spawnFullScreenConfetti() {
     // no-op
   }
