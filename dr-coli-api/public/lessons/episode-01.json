@@ -1,76 +1,114 @@
 {
   "id": "episode-01",
   "title": "안녕하세요! 안녕!",
-  "background": "puppy-playground",
+  "background": "bg-puppies.png",
   "scenes": [
     {
-      "id": "welcome",
+      "id": "s0-welcome",
       "drColi": {
+        "animation": "talk",
         "say": [
           "Hello, dear friends! My name is Dr. Coli.",
           "I’ll be teaching you Korean.",
-          "You can also call me Coli 선생님.",
-          "선생님 means teacher in Korean.",
-          "선생님, 선생님. Can you try to say it with me?"
-        ],
-        "animation": "talk"
+          "You can also call me Coli 선생님."
+        ]
       },
       "bori": { "animation": "look" },
-      "interaction": { "type": "mic_optional" }
+      "interaction": { "type": "none" }
     },
 
     {
-      "id": "meet-bori",
+      "id": "s1-teach-seonsaengnim",
       "drColi": {
+        "animation": "talk",
         "say": [
-          "And this is my friend Bori.",
-          "Bori is a puppy."
-        ],
-        "animation": "idle"
+          "선생님 means teacher in Korean.",
+          "선생님, 선생님.",
+          "Can you try to say 선생님 with me?"
+        ]
       },
-      "bori": { "animation": "wave" },
+      "bori": { "animation": "look" },
       "interaction": {
-        "type": "emoji",
-        "options": ["😊", "👋"]
+        "type": "mic",
+        "prompt": "Tap the mic when you said it!"
       }
     },
 
     {
-      "id": "annyeonghaseyo",
+      "id": "s2-meet-bori",
       "drColi": {
+        "animation": "talk",
         "say": [
-          "In Korean, when we meet adults, we say 안녕하세요.",
-          "When we say 안녕하세요, we do a little bow."
-        ],
-        "animation": "bow"
+          "And this is my friend Bori.",
+          "Bori is a puppy!",
+          "Bori and I are so happy you’re here!"
+        ]
+      },
+      "bori": { "animation": "wave" },
+      "interaction": { "type": "none" }
+    },
+
+    {
+      "id": "s3-intro-annyonghaseyo",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Since it’s so nice to meet each other, let’s say hello in Korean.",
+          "In Korean, when we meet adults, we say: 안녕하세요.",
+          "When we say 안녕하세요, we do a little bow. Like this!"
+        ]
+      },
+      "bori": { "animation": "bow" },
+      "interaction": { "type": "none" }
+    },
+
+    {
+      "id": "s4-repeat-annyonghaseyo",
+      "drColi": {
+        "animation": "bow",
+        "say": [
+          "Now let’s try it together.",
+          "Ready? 안녕하세요!"
+        ]
       },
       "bori": { "animation": "bow" },
       "interaction": {
-        "type": "repeat",
-        "target": "안녕하세요"
+        "type": "mic",
+        "prompt": "Tap the mic when you said 안녕하세요!"
       }
     },
 
     {
-      "id": "annyeong",
+      "id": "s5-emoji-check-annyonghaseyo",
       "drColi": {
+        "animation": "talk",
         "say": [
-          "When you see your friends or Bori, you can say 안녕.",
+          "Quick check!",
+          "How do we say 안녕하세요?"
+        ]
+      },
+      "bori": { "animation": "look" },
+      "interaction": {
+        "type": "emoji",
+        "choices": ["🙇‍♀️", "👋", "🏃‍♀️"],
+        "correctIndex": 0,
+        "onCorrectSay": ["Yes! We bow when we say 안녕하세요!"],
+        "onWrongSay": ["Nice try! Let’s try again. How do we say 안녕하세요?"]
+      }
+    },
+
+    {
+      "id": "s6-intro-annyong",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Now let me teach you one more hello.",
+          "When you see your friends or Bori, you can say: 안녕.",
           "And when we say 안녕, we wave!"
-        ],
-        "animation": "wave"
+        ]
       },
       "bori": { "animation": "wave" },
-      "interaction": {
-        "type": "repeat",
-        "target": "안녕"
-      }
-    },
-
-    {
-      "id": "song",
-      "type": "song",
-      "audio": "annyeong-song.mp3"
+      "interaction": { "type": "none" }
     }
   ]
 }
