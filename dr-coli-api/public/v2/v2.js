@@ -359,10 +359,13 @@ function showEmojiInteraction(interaction) {
           playScene(currentSceneIndex + 1);
         }, 300);
       } else {
-        // Wrong line
-        const msg = interaction.onWrongSay?.[0] || "So close! Let’s try again.";
-        await speakLine(msg);
-      }
+  // Wrong answer -> calm down / reset
+  setDrColi("idle");
+  setBori("idle");
+
+  const msg = interaction.onWrongSay?.[0] || "So close! Let’s try again.";
+  await speakLine(msg);
+}
     };
   });
 }
