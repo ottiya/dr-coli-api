@@ -149,12 +149,31 @@ body {
 }
 
 /* Tuned for your current tray PNG */
-.emoji-slot[data-idx="0"] { left: 31%; }
+.emoji-slot[data-idx="0"] { left: 31.5%; }
 .emoji-slot[data-idx="1"] { left: 50%; }
-.emoji-slot[data-idx="2"] { left: 69%; }
+.emoji-slot[data-idx="2"] { left: 68.5%; }
 
 .emoji-slot:active {
   transform: translate(-50%, -50%) scale(0.96);
+}
+
+.emoji-slot {
+  position: absolute;
+  top: 20px;
+  width: 120px;
+  height: 120px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: transparent;
+  border: none;
+  cursor: pointer;
+
+  font-size: 64px; /* slightly smaller so nothing touches edges */
+  line-height: 1;
+  padding: 0;
 }
 
 /* ====== Mic button ====== */
