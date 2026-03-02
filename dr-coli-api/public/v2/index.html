@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Dr. Coli v2</title>
 
-    <!-- Optional: Google font (safe to remove) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -22,25 +21,27 @@
         <!-- Background -->
         <div id="bgLayer" aria-hidden="true"></div>
 
-        <!-- Characters (you can wire sprites later) -->
+        <!-- Characters (wire sprites later) -->
         <div id="stageLayer" aria-hidden="true"></div>
 
         <!-- UI -->
         <div id="uiLayer">
+          <!-- 🔊 Tap-to-start gate (REQUIRED for audio) -->
+          <div id="audioGate" class="audio-gate">
+            <button id="startAudioBtn" class="start-audio">
+              Tap to start 🔊
+            </button>
+          </div>
+
           <!-- Dialogue -->
           <div id="dialogue" class="dialogue" aria-live="polite">
-            <img
-              src="/assets/ui/dialogue-bubble.png"
-              alt=""
-              aria-hidden="true"
-            />
+            <img src="/assets/ui/dialogue-bubble.png" alt="" aria-hidden="true" />
             <p id="dialogueText"></p>
           </div>
 
           <!-- Emoji tray -->
           <div id="emojiTray" class="emoji-tray" aria-hidden="false">
             <img src="/assets/ui/emoji-tray.png" alt="" aria-hidden="true" />
-
             <button class="emoji-slot" data-idx="0" aria-label="Choice 1"></button>
             <button class="emoji-slot" data-idx="1" aria-label="Choice 2"></button>
             <button class="emoji-slot" data-idx="2" aria-label="Choice 3"></button>
