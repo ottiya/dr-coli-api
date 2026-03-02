@@ -5,7 +5,6 @@ html, body {
   height: 100%;
   margin: 0;
 }
-
 body {
   background: #0b0b0b;
   overflow: hidden;
@@ -64,117 +63,63 @@ body {
   height: 140px;
   display: none;
   z-index: 30;
-
-  background: transparent;
   pointer-events: none;
 }
-
 .dialogue.active { display: block; }
-
-.dialogue img {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
+.dialogue img { width: 100%; height: 100%; display: block; }
 
 #dialogueText {
   position: absolute;
   left: 52px;
   right: 52px;
-  top: 0;
-  bottom: 0;
+  top: 28px;
   margin: 0;
-
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-
   font-size: 38px;
   font-weight: 800;
   line-height: 1.2;
   color: #2b2b2b;
-
   user-select: none;
-  pointer-events: none;
-
-  text-rendering: geometricPrecision;
-  -webkit-font-smoothing: antialiased;
 }
 
 /* ====== Emoji tray ====== */
 .emoji-tray {
   position: absolute;
   left: 50%;
-  bottom: -240px;
+  bottom: -220px;
   transform: translateX(-50%);
   width: 720px;
   height: 160px;
   transition: bottom 0.35s ease;
   z-index: 25;
-
   pointer-events: auto;
-  background: transparent;
 }
-
 .emoji-tray.active { bottom: 40px; }
+.emoji-tray img { width: 100%; height: 100%; display: block; }
 
-.emoji-tray img {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-/* Click zones aligned by % and centered */
 .emoji-slot {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-
   width: 112px;
   height: 112px;
-
-  background: transparent;
-  border: none;
-  cursor: pointer;
-
-  padding: 0;
-  margin: 0;
 
   display: grid;
   place-items: center;
 
-  font-size: 64px;
-  line-height: 1;
-  user-select: none;
-}
-
-/* Tuned for your current tray PNG */
-.emoji-slot[data-idx="0"] { left: 33%; }
-.emoji-slot[data-idx="1"] { left: 49%; }
-.emoji-slot[data-idx="2"] { left: 67%; }
-
-.emoji-slot:active {
-  transform: translate(-50%, -50%) scale(0.96);
-}
-
-.emoji-slot {
-  position: absolute;
-  top: 20px;
-  width: 120px;
-  height: 120px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
   background: transparent;
   border: none;
   cursor: pointer;
 
-  font-size: 64px; /* slightly smaller so nothing touches edges */
+  font-size: 64px;
   line-height: 1;
   padding: 0;
+  margin: 0;
 }
+
+/* ✅ Your tuned numbers */
+.emoji-slot[data-idx="0"] { left: 33%; }
+.emoji-slot[data-idx="1"] { left: 49%; }
+.emoji-slot[data-idx="2"] { left: 67%; }
 
 /* ====== Mic button ====== */
 .mic {
@@ -190,12 +135,7 @@ body {
   z-index: 30;
   pointer-events: auto;
 }
-
-.mic img {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
+.mic img { width: 100%; height: 100%; display: block; }
 
 /* ====== FX layer ====== */
 .fx-layer {
@@ -203,7 +143,43 @@ body {
   inset: 0;
   z-index: 40;
   pointer-events: none;
+}
+
+/* ====== CONFETTI (full-screen + slower) ====== */
+.confetti-burst {
+  position: absolute;
+  inset: 0;              /* FULL SCREEN inside viewport */
   overflow: hidden;
+  pointer-events: none;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -12%;
+  width: var(--size, 44px);
+  height: auto;
+  opacity: 0;
+  transform: translateY(0) rotate(0deg);
+  animation: confettiFall var(--dur, 1800ms) ease-out forwards;
+  animation-delay: var(--delay, 0ms);
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.18));
+}
+
+@keyframes confettiFall {
+  0% {
+    opacity: 0;
+    transform: translateY(-10%) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(130%) rotate(420deg);
+  }
 }
 
 /* ====== Helpers ====== */
