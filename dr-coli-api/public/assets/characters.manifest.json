@@ -1,0 +1,23 @@
+{
+  "drColi": {
+    "idle": ["/assets/dr-coli/idle/Dr.Coli_Idle.json"],
+    "talk": ["/assets/dr-coli/talk/Dr.Coli_Talk.json"],
+    "bow":  ["/assets/dr-coli/bow/Dr.Coli_Bow.json"],
+    "wave": [
+      "/assets/dr-coli/wave/Dr.Coli_Wave-0.json",
+      "/assets/dr-coli/wave/Dr.Coli_Wave-1.json"
+    ]
+  },
+  "bori": {
+    "idle": [
+      "/assets/bori/idle/Bori_Idle-0.json",
+      "/assets/bori/idle/Bori_Idle-1.json"
+    ],
+    "look": [
+      "/assets/bori/look/Bori_Look-0.json",
+      "/assets/bori/look/Bori_Look-1.json"
+    ],
+    "bow":  ["/assets/bori/bow/Bori_Bow.json"],
+    "wave": ["/assets/bori/wave/Bori_Wave.json"]
+  }
+}
