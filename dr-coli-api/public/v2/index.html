@@ -1,52 +1,62 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dr. Coli — v2</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dr. Coli v2</title>
 
-  <link rel="stylesheet" href="./v2.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
-</head>
+    <!-- Optional: Google font (safe to remove) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
 
-<body>
-  <div id="app">
-    <div id="viewport">
-      <!-- Background layer -->
-      <div id="bgLayer" aria-hidden="true"></div>
+    <link rel="stylesheet" href="/v2/v2.css" />
+  </head>
 
-      <!-- Stage layer (characters later) -->
-      <div id="stageLayer" aria-hidden="true"></div>
+  <body>
+    <div id="app">
+      <div id="viewport">
+        <!-- Background -->
+        <div id="bgLayer" aria-hidden="true"></div>
 
-      <!-- UI layer -->
-      <div id="uiLayer">
-        <!-- Dialogue bubble -->
-        <div id="dialogue" class="dialogue">
-          <img id="dialogueImg" src="/assets/ui/dialogue-bubble.png" alt="" />
-          <p id="dialogueText"></p>
+        <!-- Characters (you can wire sprites later) -->
+        <div id="stageLayer" aria-hidden="true"></div>
+
+        <!-- UI -->
+        <div id="uiLayer">
+          <!-- Dialogue -->
+          <div id="dialogue" class="dialogue" aria-live="polite">
+            <img
+              src="/assets/ui/dialogue-bubble.png"
+              alt=""
+              aria-hidden="true"
+            />
+            <p id="dialogueText"></p>
+          </div>
+
+          <!-- Emoji tray -->
+          <div id="emojiTray" class="emoji-tray" aria-hidden="false">
+            <img src="/assets/ui/emoji-tray.png" alt="" aria-hidden="true" />
+
+            <button class="emoji-slot" data-idx="0" aria-label="Choice 1"></button>
+            <button class="emoji-slot" data-idx="1" aria-label="Choice 2"></button>
+            <button class="emoji-slot" data-idx="2" aria-label="Choice 3"></button>
+          </div>
+
+          <!-- Mic -->
+          <button id="micButton" class="mic hidden" aria-label="Tap to continue">
+            <img src="/assets/ui/mic-button.png" alt="" />
+          </button>
+
+          <!-- FX -->
+          <div id="fxLayer" class="fx-layer" aria-hidden="true"></div>
         </div>
-
-        <!-- Emoji tray -->
-        <div id="emojiTray" class="emoji-tray" aria-hidden="true">
-          <img id="emojiTrayImg" src="/assets/ui/emoji-tray.png" alt="" />
-          <button class="emoji-slot" data-idx="0" aria-label="emoji choice 1"></button>
-          <button class="emoji-slot" data-idx="1" aria-label="emoji choice 2"></button>
-          <button class="emoji-slot" data-idx="2" aria-label="emoji choice 3"></button>
-        </div>
-
-        <!-- Mic button -->
-        <button id="micButton" class="mic hidden" aria-label="Speak">
-          <img src="/assets/ui/mic-button.png" alt="" />
-        </button>
       </div>
-
-      <!-- FX layer (confetti etc.) -->
-      <div id="fxLayer" class="fx-layer" aria-hidden="true"></div>
     </div>
-  </div>
 
-  <script src="./v2.js"></script>
-</body>
+    <script src="/v2/v2.js"></script>
+  </body>
 </html>
