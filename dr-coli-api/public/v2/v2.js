@@ -1,4 +1,4 @@
-/* v2.js — episode engine + full-screen confetti */
+/* v2.js — episode engine + full-screen confetti (top->bottom, long, remove at bottom) */
 
 let currentSceneIndex = 0;
 let episodeData = null;
@@ -14,6 +14,7 @@ const emojiSlots = Array.from(document.querySelectorAll('.emoji-slot'));
 
 const micButton = document.getElementById('micButton');
 const fxLayer = document.getElementById('fxLayer');
+const viewport = document.getElementById('viewport');
 
 // Confetti assets you already have
 const CONFETTI_ASSETS = [
@@ -65,7 +66,6 @@ function playScene(index) {
    Background
 ========================= */
 function setBackground(bgFile) {
-  // allow passing full filename or just "bg-puppies.png"
   const path = bgFile.startsWith('/assets/')
     ? bgFile
     : `/assets/backgrounds/${bgFile}`;
@@ -88,7 +88,6 @@ function playDialogue(lines, done) {
 
   const advance = () => {
     if (i >= lines.length) {
-      // short beat before interaction shows
       setTimeout(() => done?.(), 250);
       return;
     }
@@ -96,7 +95,7 @@ function playDialogue(lines, done) {
     dialogueText.textContent = lines[i];
     i += 1;
 
-    // Auto-advance timing: tweak as needed
+    // Auto-advance timing (later tie to audio)
     setTimeout(advance, 1400);
   };
 
@@ -115,7 +114,6 @@ function hideDialogue() {
 ========================= */
 function enableInteraction(interaction) {
   if (!interaction || interaction.type === 'none') {
-    // auto-advance
     setTimeout(() => playScene(currentSceneIndex + 1), 700);
     return;
   }
@@ -130,7 +128,6 @@ function enableInteraction(interaction) {
     return;
   }
 
-  // fallback
   setTimeout(() => playScene(currentSceneIndex + 1), 700);
 }
 
@@ -144,12 +141,9 @@ function showEmojiTray(interaction) {
   const choices = interaction.choices || ['🙇‍♀️', '👋', '🏃‍♀️'];
   const correctIndex = typeof interaction.correctIndex === 'number' ? interaction.correctIndex : 0;
 
-  // Fill slots
   emojiSlots.forEach((btn, idx) => {
     btn.textContent = choices[idx] ?? '';
     btn.disabled = false;
-
-    // clear old listeners (safe pattern)
     btn.onclick = null;
     btn.onclick = () => handleEmojiPick(idx, correctIndex, interaction);
   });
@@ -166,34 +160,30 @@ function hideEmojiTray() {
 }
 
 function handleEmojiPick(pickedIdx, correctIdx, interaction) {
-  // lock
   emojiSlots.forEach(b => (b.disabled = true));
 
   if (pickedIdx === correctIdx) {
-    // ✅ success feedback
-    playConfettiFullScreen();
+    // ✅ Full-screen confetti (top->bottom, long)
+    playConfettiTopToBottom();
 
-    // If you want to also change dialogue line on success:
     const praise = interaction.praise || 'Yes! Great job!';
     showDialogue();
     dialogueText.textContent = praise;
 
-    // Give kids time to see confetti + hear praise
+    // Let kids actually SEE the celebration
     setTimeout(() => {
       hideEmojiTray();
       playScene(currentSceneIndex + 1);
-    }, 1600);
+    }, 2200);
 
   } else {
-    // ❌ gentle retry
     const retry = interaction.retry || 'Nice try! Let’s try again.';
     showDialogue();
     dialogueText.textContent = retry;
 
     setTimeout(() => {
-      // re-enable for retry
       emojiSlots.forEach(b => (b.disabled = false));
-    }, 600);
+    }, 650);
   }
 }
 
@@ -207,7 +197,6 @@ function showMic(interaction) {
   micButton.onclick = () => {
     micButton.classList.add('hidden');
     micButton.onclick = null;
-    // advance
     setTimeout(() => playScene(currentSceneIndex + 1), 250);
   };
 }
@@ -218,63 +207,67 @@ function hideMic() {
 }
 
 /* =========================
-   Full-screen confetti
+   Confetti: TOP -> BOTTOM, long, remove at bottom
 ========================= */
-function playConfettiFullScreen() {
-  // Create a burst container that covers the whole viewport
-  const burst = document.createElement('div');
-  burst.className = 'confetti-burst';
+function playConfettiTopToBottom() {
+  if (!fxLayer || !viewport) return;
 
-  // number of pieces
-  const N = 28;
+  // Use the real viewport dimensions (not the window)
+  const w = viewport.clientWidth;
+  const h = viewport.clientHeight;
 
-  for (let i = 0; i < N; i++) {
+  const pieceCount = 42;          // more pieces, full-screen feel
+  const minDur = 4200;            // 4.2s
+  const maxDur = 6200;            // 6.2s
+
+  for (let i = 0; i < pieceCount; i++) {
     const img = document.createElement('img');
     img.className = 'confetti-piece';
     img.alt = '';
 
-    // random asset
-    const src = CONFETTI_ASSETS[Math.floor(Math.random() * CONFETTI_ASSETS.length)];
-    img.src = src;
+    img.src = CONFETTI_ASSETS[Math.floor(Math.random() * CONFETTI_ASSETS.length)];
 
-    // spread across entire width
-    const x = Math.random() * 100;
+    const size = 22 + Math.random() * 40;        // 22..62px
+    const startX = Math.random() * w;            // anywhere across width
+    const startY = - (60 + Math.random() * 180); // above the top edge
+    const endY = h + 200;                        // past bottom edge
+    const driftX = (Math.random() - 0.5) * 280;  // sideways drift
 
-    // random size
-    const size = 28 + Math.random() * 34; // 28..62 px
+    const rot0 = Math.random() * 360;
+    const rot1 = rot0 + (Math.random() - 0.5) * 1400;
 
-    // random delay so it feels alive (still short)
-    const delay = Math.random() * 250; // 0..250ms
+    const dur = minDur + Math.random() * (maxDur - minDur);
+    const delay = Math.random() * 250;           // tiny stagger
 
-    // slower duration
-    const dur = 1700 + Math.random() * 600; // 1700..2300ms
+    img.style.width = `${size}px`;
+    img.style.left = `${startX}px`;
+    img.style.top = `${startY}px`;
+    img.style.opacity = '1';
 
-    img.style.left = `${x}%`;
-    img.style.setProperty('--size', `${size}px`);
-    img.style.setProperty('--delay', `${Math.round(delay)}ms`);
-    img.style.setProperty('--dur', `${Math.round(dur)}ms`);
+    fxLayer.appendChild(img);
 
-    burst.appendChild(img);
+    // Animate with Web Animations API so we can remove exactly at bottom
+    const anim = img.animate(
+      [
+        { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: 1 },
+        { transform: `translate(${driftX}px, ${endY * 0.85}px) rotate(${rot1 * 0.7}deg)`, opacity: 1 },
+        // Fade only at the very end (so it stays visible)
+        { transform: `translate(${driftX * 1.2}px, ${endY}px) rotate(${rot1}deg)`, opacity: 0 }
+      ],
+      {
+        duration: dur,
+        delay,
+        easing: 'linear',
+        fill: 'forwards'
+      }
+    );
+
+    anim.onfinish = () => {
+      img.remove();
+    };
   }
-
-  fxLayer.appendChild(burst);
-
-  // remove after max duration
-  setTimeout(() => {
-    burst.remove();
-  }, 2600);
 }
 
 function clearFX() {
   fxLayer.innerHTML = '';
 }
-
-/* =========================
-   Optional: click to advance (debug helper)
-   Uncomment if you want tap-to-skip while testing
-========================= */
-// document.getElementById('viewport').addEventListener('click', (e) => {
-//   // avoid clicking on emoji buttons/mic
-//   if (e.target.closest('.emoji-tray') || e.target.closest('.mic')) return;
-//   playScene(currentSceneIndex + 1);
-// });
