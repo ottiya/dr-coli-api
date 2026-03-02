@@ -30,7 +30,9 @@
       "interaction": {
         "type": "mic",
         "target": "선생님",
-        "prompt": "Tap the mic, then say 선생님!"
+        "prompt": "Tap the mic, then say 선생님!",
+        "onSuccessSay": ["Yes!! Amazing job!"],
+        "onFailSay": ["So close! Let’s try together one more time."]
       }
     },
     {
@@ -72,7 +74,9 @@
       "interaction": {
         "type": "mic",
         "target": "안녕하세요",
-        "prompt": "Tap the mic, then say 안녕하세요!"
+        "prompt": "Tap the mic, then say 안녕하세요!",
+        "onSuccessSay": ["Yes!! Amazing job!"],
+        "onFailSay": ["So close! Let’s try together one more time."]
       }
     },
     {
