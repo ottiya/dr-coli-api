@@ -1,11 +1,9 @@
-/* public/v2/v2.js
-   Episode engine + pre-generate ElevenLabs TTS on load (Blob cached).
-*/
+/* public/v2/v2.js — Episode engine + ElevenLabs pregen (Blob cached) + reliable audio unlock */
 
 let currentSceneIndex = 0;
 let episodeData = null;
 
-// ====== DOM ======
+// DOM
 const bgLayer = document.getElementById("bgLayer");
 const dialogueEl = document.getElementById("dialogue");
 const dialogueTextEl = document.getElementById("dialogueText");
@@ -16,84 +14,74 @@ const emojiButtons = Array.from(document.querySelectorAll(".emoji-slot"));
 const micButtonEl = document.getElementById("micButton");
 const fxLayer = document.getElementById("fxLayer");
 
-// ====== Audio ======
-let audio = null;
+const audioGateEl = document.getElementById("audioGate");
+const startAudioBtn = document.getElementById("startAudioBtn");
 
-// ====== Boot ======
+// single shared audio element (better for autoplay reliability)
+const audio = new Audio();
+audio.preload = "auto";
+
 boot().catch((e) => console.error("BOOT ERROR:", e));
 
 async function boot() {
-  // Default background so it’s not black while loading
   setBackground("/assets/backgrounds/bg-puppies.png");
 
-  // Load episode JSON
   episodeData = await fetchJson("/lessons/episode-01.json");
 
-  // Pre-generate / fetch cached audio for all Dr. Coli lines
-  await preGenerateEpisodeAudio(episodeData);
+  // Must tap once to unlock audio
+  await waitForAudioUnlock();
 
-  // Start
+  // IMPORTANT: generate Scene 0 first + preload its first clip
+  await preGenerateSceneAudio(episodeData, 0);
+  await preloadFirstClipIfExists(episodeData, 0);
+
+  // Then pre-generate rest in background (don’t block demo)
+  preGenerateRemainingScenes(episodeData).catch((e) =>
+    console.warn("Background pregen error:", e)
+  );
+
   playScene(0);
 }
 
-// ====== Helpers ======
+/* ===== Audio unlock ===== */
+function waitForAudioUnlock() {
+  return new Promise((resolve) => {
+    audioGateEl.classList.remove("hidden");
+
+    startAudioBtn.onclick = async () => {
+      try {
+        // Attempt a play/pause on the real shared audio element
+        audio.src = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA";
+        await audio.play().catch(() => {});
+        audio.pause();
+        audio.currentTime = 0;
+        audio.src = "";
+      } catch {}
+
+      audioGateEl.classList.add("hidden");
+      startAudioBtn.onclick = null;
+      resolve();
+    };
+  });
+}
+
+/* ===== Fetch helpers ===== */
 async function fetchJson(url) {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
   return res.json();
 }
 
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/* ===== Background ===== */
 function setBackground(path) {
   bgLayer.style.backgroundImage = `url("${path}")`;
 }
 
-function setDrColi(animationName) {
-  // placeholder - wire your sprite engine later
-  // console.log("DrColi animation:", animationName);
-}
-
-function setBori(animationName) {
-  // placeholder - wire your sprite engine later
-  // console.log("Bori animation:", animationName);
-}
-
-// ====== Episode audio pre-gen ======
-async function preGenerateEpisodeAudio(ep) {
-  if (!ep?.scenes?.length) return;
-
-  // Collect all lines in order and store back into scene._audioUrls
-  const tasks = [];
-
-  for (let s = 0; s < ep.scenes.length; s++) {
-    const scene = ep.scenes[s];
-    const lines = scene?.drColi?.say || [];
-    scene._audioUrls = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const text = String(lines[i] || "").trim();
-      if (!text) {
-        scene._audioUrls.push(null);
-        continue;
-      }
-
-      // Create a task that fetches URL and stores it in the right index
-      const task = (async () => {
-        const url = await getElevenLabsTtsUrl(text);
-        scene._audioUrls[i] = url;
-      })();
-
-      tasks.push(task);
-    }
-  }
-
-  // Run in batches to avoid hammering the API
-  const BATCH_SIZE = 4;
-  for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
-    const chunk = tasks.slice(i, i + BATCH_SIZE);
-    await Promise.all(chunk);
-  }
-}
-
+/* ===== TTS helpers ===== */
 async function getElevenLabsTtsUrl(text) {
   const res = await fetch("/api/tts-elevenlabs", {
     method: "POST",
@@ -103,46 +91,84 @@ async function getElevenLabsTtsUrl(text) {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    console.error("TTS endpoint failed:", res.status, detail);
-    return null; // fallback: no audio
+    console.error("TTS FAILED:", res.status, detail, "TEXT:", text);
+    return null;
   }
 
-  const data = await res.json();
-  return data?.url || null;
+  const data = await res.json().catch(() => null);
+  if (!data?.url) {
+    console.error("TTS RESPONSE MISSING url:", data, "TEXT:", text);
+    return null;
+  }
+  return data.url;
 }
 
-// ====== Scene player ======
+async function preGenerateSceneAudio(ep, sceneIndex) {
+  const scene = ep?.scenes?.[sceneIndex];
+  if (!scene) return;
+
+  const lines = scene?.drColi?.say || [];
+  scene._audioUrls = scene._audioUrls || [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const text = String(lines[i] || "").trim();
+    if (!text) {
+      scene._audioUrls[i] = null;
+      continue;
+    }
+    if (scene._audioUrls[i]) continue;
+
+    const url = await getElevenLabsTtsUrl(text);
+    scene._audioUrls[i] = url;
+  }
+}
+
+async function preloadFirstClipIfExists(ep, sceneIndex) {
+  const scene = ep?.scenes?.[sceneIndex];
+  const firstUrl = scene?._audioUrls?.[0];
+  if (!firstUrl) return;
+
+  try {
+    // preload by fetching; browser caches it
+    await fetch(firstUrl, { mode: "cors" }).catch(() => {});
+  } catch {}
+}
+
+async function preGenerateRemainingScenes(ep) {
+  if (!ep?.scenes?.length) return;
+  for (let s = 1; s < ep.scenes.length; s++) {
+    await preGenerateSceneAudio(ep, s);
+    // tiny pause so we don’t hammer
+    await sleep(120);
+  }
+}
+
+/* ===== Scene engine ===== */
 function playScene(index) {
   currentSceneIndex = index;
 
   if (!episodeData?.scenes?.[index]) {
-    console.warn("Scene not found:", index);
     endEpisode();
     return;
   }
 
   const scene = episodeData.scenes[index];
 
-  // Reset UI state
   hideEmojiTray();
   hideMic();
   clearFx();
 
-  // Set scene visuals
   setBackground(scene.background || "/assets/backgrounds/bg-puppies.png");
-  setDrColi(scene?.drColi?.animation || "idle");
-  setBori(scene?.bori?.animation || "idle");
 
-  // Play lines with audio
   const lines = scene?.drColi?.say || [];
-  const audioUrls = scene?._audioUrls || [];
+  const urls = scene?._audioUrls || [];
 
-  playDialogueWithAudio(lines, audioUrls, async () => {
+  playDialogueWithAudio(lines, urls, () => {
     enableInteraction(scene.interaction || { type: "none" });
   });
 }
 
-// ====== Dialogue + audio ======
+/* ===== Dialogue + audio ===== */
 function showDialogue(text) {
   dialogueEl.classList.add("active");
   dialogueTextEl.textContent = text;
@@ -152,91 +178,82 @@ function hideDialogue() {
   dialogueTextEl.textContent = "";
 }
 
-async function playDialogueWithAudio(lines, audioUrls, onDone) {
-  if (!lines || lines.length === 0) {
-    hideDialogue();
-    onDone?.();
-    return;
-  }
-
-  let i = 0;
-
-  const next = async () => {
-    if (i >= lines.length) {
-      hideDialogue();
-      onDone?.();
-      return;
-    }
-
-    const text = String(lines[i] || "").trim();
-    const url = audioUrls?.[i] || null;
-
-    // Show text immediately
-    showDialogue(text);
-
-    // Play audio if available; otherwise small delay
-    if (url) {
-      await playAudioUrl(url);
-    } else {
-      // fallback: readable pause
-      await sleep(Math.max(900, Math.min(2400, text.length * 35)));
-    }
-
-    // Small beat between lines
-    await sleep(250);
-    i++;
-    next();
-  };
-
-  next();
-}
-
 function stopAudio() {
-  if (audio) {
+  try {
     audio.pause();
     audio.currentTime = 0;
-    audio = null;
-  }
+  } catch {}
 }
 
 function playAudioUrl(url) {
   return new Promise((resolve) => {
-    try {
-      stopAudio();
-      audio = new Audio(url);
+    stopAudio();
+    audio.src = url;
 
-      // iOS Safari needs user gesture sometimes — this will still work on desktop.
-      audio.onended = () => resolve();
-      audio.onerror = () => resolve();
-
-      audio.play().catch(() => {
-        // If autoplay blocked, just wait a bit so pacing isn't broken
-        resolveAfterDelay(resolve, 1200);
-      });
-    } catch {
+    const cleanup = () => {
+      audio.onended = null;
+      audio.onerror = null;
       resolve();
-    }
+    };
+
+    audio.onended = cleanup;
+    audio.onerror = cleanup;
+
+    audio.play().catch(() => {
+      // If anything blocks, resolve so lesson continues
+      cleanup();
+    });
   });
 }
 
-function resolveAfterDelay(resolve, ms) {
-  setTimeout(() => resolve(), ms);
+async function playDialogueWithAudio(lines, urls, done) {
+  if (!lines || lines.length === 0) {
+    hideDialogue();
+    done?.();
+    return;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const text = String(lines[i] || "").trim();
+    if (!text) continue;
+
+    showDialogue(text);
+
+    // If url missing (not generated yet), try generating on demand
+    let url = urls?.[i] || null;
+    if (!url) {
+      url = await getElevenLabsTtsUrl(text);
+      if (episodeData?.scenes?.[currentSceneIndex]) {
+        episodeData.scenes[currentSceneIndex]._audioUrls[i] = url;
+      }
+    }
+
+    if (url) {
+      await playAudioUrl(url);
+      await sleep(180);
+    } else {
+      // fallback timer if TTS fails
+      await sleep(Math.max(900, Math.min(2200, text.length * 35)));
+    }
+  }
+
+  await sleep(200);
+  hideDialogue();
+  done?.();
 }
 
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-// ====== Interaction ======
+/* ===== Interaction ===== */
 function enableInteraction(interaction) {
   if (!interaction || interaction.type === "none") {
-    // auto-advance
     setTimeout(() => playScene(currentSceneIndex + 1), 800);
     return;
   }
 
   if (interaction.type === "emoji") {
-    showEmojiTray(interaction.choices || ["🙇‍♀️", "👋", "🏃‍♀️"], interaction.correctIndex ?? 0);
+    showEmojiTray(
+      interaction.choices || ["🙇‍♀️", "👋", "🏃‍♀️"],
+      interaction.correctIndex ?? 0
+    );
     return;
   }
 
@@ -245,20 +262,18 @@ function enableInteraction(interaction) {
     return;
   }
 
-  // fallback
   setTimeout(() => playScene(currentSceneIndex + 1), 800);
 }
 
+/* ===== Emoji tray ===== */
 function showEmojiTray(choices, correctIndex) {
   emojiTrayEl.classList.add("active");
 
   emojiButtons.forEach((btn, idx) => {
     btn.textContent = choices?.[idx] || "";
     btn.onclick = () => {
-      const isCorrect = idx === correctIndex;
-      if (isCorrect) {
+      if (idx === correctIndex) {
         confettiFullScreen();
-        // quick praise moment
         showDialogue("Yes! Great job!");
         setTimeout(() => {
           hideEmojiTray();
@@ -266,10 +281,6 @@ function showEmojiTray(choices, correctIndex) {
         }, 900);
       } else {
         showDialogue("Nice try! Try again!");
-        setTimeout(() => {
-          // keep tray open
-          showDialogue("Pick the best one!");
-        }, 700);
       }
     };
   });
@@ -280,6 +291,7 @@ function hideEmojiTray() {
   emojiButtons.forEach((btn) => (btn.onclick = null));
 }
 
+/* ===== Mic ===== */
 function showMic() {
   micButtonEl.classList.remove("hidden");
   micButtonEl.onclick = () => {
@@ -293,12 +305,9 @@ function hideMic() {
   micButtonEl.onclick = null;
 }
 
-// ====== Confetti (full screen) ======
+/* ===== Confetti ===== */
 function confettiFullScreen() {
   clearFx();
-
-  // Use your existing confetti PNG (or swap path if you use a different one)
-  // This makes it fall from top to bottom across the whole viewport.
   const img = document.createElement("img");
   img.src = "/assets/ui/confetti-star.png";
   img.alt = "";
@@ -306,31 +315,27 @@ function confettiFullScreen() {
   img.style.left = "0";
   img.style.top = "-20%";
   img.style.width = "100%";
-  img.style.height = "auto";
   img.style.opacity = "0.95";
   img.style.pointerEvents = "none";
 
-  // Animation: fall down, then remove
   img.animate(
     [
       { transform: "translateY(0)", opacity: 0.95 },
       { transform: "translateY(140%)", opacity: 0.95 },
-      { transform: "translateY(160%)", opacity: 0 }
+      { transform: "translateY(160%)", opacity: 0 },
     ],
     { duration: 1800, easing: "ease-in", fill: "forwards" }
   );
 
   fxLayer.appendChild(img);
-
-  // Cleanup after animation
-  setTimeout(() => clearFx(), 1900);
+  setTimeout(clearFx, 1900);
 }
 
 function clearFx() {
   fxLayer.innerHTML = "";
 }
 
-// ====== End ======
+/* ===== End ===== */
 function endEpisode() {
   hideEmojiTray();
   hideMic();
