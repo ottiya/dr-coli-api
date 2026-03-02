@@ -1,0 +1,26 @@
+#dialogue {
+  position: absolute;
+  left: 50%;
+  bottom: 220px;
+  transform: translateX(-50%);
+  z-index: 20;
+}
+
+#emojiTray {
+  position: absolute;
+  left: 50%;
+  bottom: -200px; /* hidden */
+  transform: translateX(-50%);
+  transition: bottom 0.4s ease;
+}
+
+#emojiTray.active {
+  bottom: 40px;
+}
+
+#micButton {
+  position: absolute;
+  right: 40px;
+  bottom: 40px;
+  z-index: 25;
+}
