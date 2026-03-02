@@ -1,4 +1,4 @@
-/* public/v2/v2.js — Episode engine + ElevenLabs pregen (Blob cached) + reliable audio unlock */
+/* public/v2/v2.js — Episode engine + ElevenLabs pregen (Blob cached) + tap-anywhere audio unlock */
 
 let currentSceneIndex = 0;
 let episodeData = null;
@@ -15,9 +15,8 @@ const micButtonEl = document.getElementById("micButton");
 const fxLayer = document.getElementById("fxLayer");
 
 const audioGateEl = document.getElementById("audioGate");
-const startAudioBtn = document.getElementById("startAudioBtn");
 
-// single shared audio element (better for autoplay reliability)
+// single shared audio element (more reliable)
 const audio = new Audio();
 audio.preload = "auto";
 
@@ -31,11 +30,10 @@ async function boot() {
   // Must tap once to unlock audio
   await waitForAudioUnlock();
 
-  // IMPORTANT: generate Scene 0 first + preload its first clip
+  // Generate Scene 0 first so first lines aren’t silent
   await preGenerateSceneAudio(episodeData, 0);
-  await preloadFirstClipIfExists(episodeData, 0);
 
-  // Then pre-generate rest in background (don’t block demo)
+  // Generate remaining scenes in background
   preGenerateRemainingScenes(episodeData).catch((e) =>
     console.warn("Background pregen error:", e)
   );
@@ -43,14 +41,14 @@ async function boot() {
   playScene(0);
 }
 
-/* ===== Audio unlock ===== */
+/* ===== Audio unlock (tap anywhere) ===== */
 function waitForAudioUnlock() {
   return new Promise((resolve) => {
+    // Show overlay
     audioGateEl.classList.remove("hidden");
 
-    startAudioBtn.onclick = async () => {
+    const unlock = async () => {
       try {
-        // Attempt a play/pause on the real shared audio element
         audio.src = "data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAA";
         await audio.play().catch(() => {});
         audio.pause();
@@ -59,9 +57,12 @@ function waitForAudioUnlock() {
       } catch {}
 
       audioGateEl.classList.add("hidden");
-      startAudioBtn.onclick = null;
+      audioGateEl.removeEventListener("pointerdown", unlock);
       resolve();
     };
+
+    // Any tap/click anywhere unlocks
+    audioGateEl.addEventListener("pointerdown", unlock, { once: true });
   });
 }
 
@@ -96,11 +97,7 @@ async function getElevenLabsTtsUrl(text) {
   }
 
   const data = await res.json().catch(() => null);
-  if (!data?.url) {
-    console.error("TTS RESPONSE MISSING url:", data, "TEXT:", text);
-    return null;
-  }
-  return data.url;
+  return data?.url || null;
 }
 
 async function preGenerateSceneAudio(ep, sceneIndex) {
@@ -123,22 +120,10 @@ async function preGenerateSceneAudio(ep, sceneIndex) {
   }
 }
 
-async function preloadFirstClipIfExists(ep, sceneIndex) {
-  const scene = ep?.scenes?.[sceneIndex];
-  const firstUrl = scene?._audioUrls?.[0];
-  if (!firstUrl) return;
-
-  try {
-    // preload by fetching; browser caches it
-    await fetch(firstUrl, { mode: "cors" }).catch(() => {});
-  } catch {}
-}
-
 async function preGenerateRemainingScenes(ep) {
   if (!ep?.scenes?.length) return;
   for (let s = 1; s < ep.scenes.length; s++) {
     await preGenerateSceneAudio(ep, s);
-    // tiny pause so we don’t hammer
     await sleep(120);
   }
 }
@@ -199,10 +184,7 @@ function playAudioUrl(url) {
     audio.onended = cleanup;
     audio.onerror = cleanup;
 
-    audio.play().catch(() => {
-      // If anything blocks, resolve so lesson continues
-      cleanup();
-    });
+    audio.play().catch(cleanup);
   });
 }
 
@@ -219,20 +201,16 @@ async function playDialogueWithAudio(lines, urls, done) {
 
     showDialogue(text);
 
-    // If url missing (not generated yet), try generating on demand
     let url = urls?.[i] || null;
     if (!url) {
       url = await getElevenLabsTtsUrl(text);
-      if (episodeData?.scenes?.[currentSceneIndex]) {
-        episodeData.scenes[currentSceneIndex]._audioUrls[i] = url;
-      }
+      episodeData.scenes[currentSceneIndex]._audioUrls[i] = url;
     }
 
     if (url) {
       await playAudioUrl(url);
       await sleep(180);
     } else {
-      // fallback timer if TTS fails
       await sleep(Math.max(900, Math.min(2200, text.length * 35)));
     }
   }
@@ -308,6 +286,7 @@ function hideMic() {
 /* ===== Confetti ===== */
 function confettiFullScreen() {
   clearFx();
+
   const img = document.createElement("img");
   img.src = "/assets/ui/confetti-star.png";
   img.alt = "";
