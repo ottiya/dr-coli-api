@@ -124,14 +124,14 @@ body {
   display: block;
 }
 
-/* Click zones aligned by percentage so it matches any tray art tweaks */
+/* Click zones aligned by % and centered */
 .emoji-slot {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
 
-  width: 130px;
-  height: 130px;
+  width: 112px;
+  height: 112px;
 
   background: transparent;
   border: none;
@@ -140,21 +140,19 @@ body {
   padding: 0;
   margin: 0;
 
-  /* Center emoji perfectly */
   display: grid;
   place-items: center;
 
-  font-size: 76px;
+  font-size: 64px;
   line-height: 1;
   user-select: none;
 }
 
-/* These % values are tuned for a 720x160 tray */
-.emoji-slot[data-idx="0"] { left: 23%; }
+/* Tuned for your current tray PNG */
+.emoji-slot[data-idx="0"] { left: 28%; }
 .emoji-slot[data-idx="1"] { left: 50%; }
-.emoji-slot[data-idx="2"] { left: 77%; }
+.emoji-slot[data-idx="2"] { left: 72%; }
 
-/* Optional: tiny press feedback */
 .emoji-slot:active {
   transform: translate(-50%, -50%) scale(0.96);
 }
@@ -186,7 +184,7 @@ body {
   inset: 0;
   z-index: 40;
   pointer-events: none;
-  overflow: hidden; /* important so confetti doesn't create scrollbars */
+  overflow: hidden;
 }
 
 /* ====== Helpers ====== */
