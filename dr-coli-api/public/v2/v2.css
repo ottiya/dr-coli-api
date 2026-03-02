@@ -149,9 +149,9 @@ body {
 }
 
 /* Tuned for your current tray PNG */
-.emoji-slot[data-idx="0"] { left: 32%; }
-.emoji-slot[data-idx="1"] { left: 50%; }
-.emoji-slot[data-idx="2"] { left: 68%; }
+.emoji-slot[data-idx="0"] { left: 33%; }
+.emoji-slot[data-idx="1"] { left: 49%; }
+.emoji-slot[data-idx="2"] { left: 67%; }
 
 .emoji-slot:active {
   transform: translate(-50%, -50%) scale(0.96);
