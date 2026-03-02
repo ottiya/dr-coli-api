@@ -30,6 +30,7 @@
       "bori": { "animation": "look" },
       "interaction": {
         "type": "mic",
+        "target": "선생님",
         "prompt": "Tap the mic when you said it!"
       }
     },
@@ -74,6 +75,7 @@
       "bori": { "animation": "bow" },
       "interaction": {
         "type": "mic",
+        "target": "안녕하세요",
         "prompt": "Tap the mic when you said 안녕하세요!"
       }
     },
