@@ -1,41 +1,50 @@
 // v2.js
+// Episode One engine (Phase 3 – visuals + dialogue only)
 
 let currentSceneIndex = 0;
 let episodeData = null;
 
-// ---------- Boot ----------
-fetch('/lessons/episode-01.json')
-  .then((res) => {
-    if (!res.ok) throw new Error(`Failed to load episode JSON: ${res.status}`);
-    return res.json();
-  })
-  .then((data) => {
-    episodeData = data;
+// ---------- BOOT ----------
+document.addEventListener('DOMContentLoaded', () => {
+  // ✅ Set DEFAULT background immediately
+  setBackground('bg-puppies.png');
 
-    // Optional: set a default background if your episode JSON doesn't have one yet
-    if (episodeData.background) setBackground(episodeData.background);
+  // Load episode data
+  fetch('/lessons/episode-01.json')
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`Failed to load episode JSON: ${res.status}`);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      episodeData = data;
+      playScene(0);
+    })
+    .catch((err) => console.error(err));
+});
 
-    playScene(0);
-  })
-  .catch((err) => console.error(err));
-
-// ---------- Scene Engine ----------
+// ---------- SCENE ENGINE ----------
 function playScene(index) {
   currentSceneIndex = index;
 
   if (!episodeData || !episodeData.scenes || !episodeData.scenes[index]) {
-    console.error('Scene not found:', index);
+    console.warn('No more scenes or scene not found:', index);
     return;
   }
 
   const scene = episodeData.scenes[index];
 
-  setBackground(scene.background || episodeData.background);
+  // Scene-specific background (optional)
+  if (scene.background) {
+    setBackground(scene.background);
+  }
 
-  // These are placeholders for now. You can keep them even if not implemented yet.
+  // Character states (placeholders for now)
   setDrColi(scene.drColi?.animation || 'idle');
   setBori(scene.bori?.animation || 'idle');
 
+  // Dialogue
   const lines = scene.drColi?.say || [];
   playDialogue(lines, () => {
     enableInteraction(scene.interaction || { type: 'none' });
@@ -43,6 +52,7 @@ function playScene(index) {
 }
 
 function enableInteraction(interaction) {
+  // Phase 3: only auto-advance
   if (!interaction || interaction.type === 'none') {
     setTimeout(() => {
       playScene(currentSceneIndex + 1);
@@ -53,33 +63,31 @@ function enableInteraction(interaction) {
   console.log('Interaction not implemented yet:', interaction);
 }
 
-// ---------- UI Helpers ----------
-function setBackground(bg) {
-  // bg can be a full path like "/assets/backgrounds/puppy.png"
-  // or a filename like "puppy.png" (we'll resolve it)
+// ---------- UI HELPERS ----------
+function setBackground(filename) {
   const bgLayer = document.getElementById('bgLayer');
   if (!bgLayer) return;
 
-  const url = bg.startsWith('/') ? bg : `/assets/backgrounds/${bg}`;
+  const url = `/assets/backgrounds/${filename}`;
   bgLayer.style.backgroundImage = `url("${url}")`;
 }
 
-// Placeholder stubs so your console doesn't explode if not implemented yet
+// Placeholder stubs (sprites come later)
 function setDrColi(state) {
-  // TODO: hook Pixi / sprite later
-  // console.log('Dr. Coli state:', state);
-}
-function setBori(state) {
-  // TODO: hook Pixi / sprite later
-  // console.log('Bori state:', state);
+  // console.log('Dr. Coli animation:', state);
 }
 
+function setBori(state) {
+  // console.log('Bori animation:', state);
+}
+
+// ---------- DIALOGUE ----------
 function playDialogue(lines, onDone) {
   const dialogueEl = document.getElementById('dialogue');
   const textEl = document.getElementById('dialogueText');
 
   if (!dialogueEl || !textEl) {
-    console.warn('Dialogue UI not found (#dialogue / #dialogueText).');
+    console.warn('Dialogue UI missing');
     onDone?.();
     return;
   }
@@ -93,20 +101,21 @@ function playDialogue(lines, onDone) {
   dialogueEl.classList.add('active');
 
   let i = 0;
-  const next = () => {
+
+  const nextLine = () => {
     if (i >= lines.length) {
       setTimeout(() => {
         dialogueEl.classList.remove('active');
         onDone?.();
-      }, 250);
+      }, 300);
       return;
     }
 
     textEl.textContent = lines[i];
     i += 1;
 
-    setTimeout(next, 1200);
+    setTimeout(nextLine, 1200);
   };
 
-  next();
+  nextLine();
 }
