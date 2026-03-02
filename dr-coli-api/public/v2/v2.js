@@ -1,12 +1,11 @@
 // v2.js
-// Episode engine — Phase 3: dialogue + emoji tray + mic placeholder + confetti
+// Episode engine — Phase 3: dialogue + emoji tray + mic placeholder + full-screen confetti
 
 let currentSceneIndex = 0;
 let episodeData = null;
 
 // ---------- BOOT ----------
 document.addEventListener('DOMContentLoaded', () => {
-  // Default background immediately
   setBackground('bg-puppies.png');
 
   fetch('/lessons/episode-01.json')
@@ -17,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     .then((data) => {
       episodeData = data;
 
-      // Episode-level default background (overrides our hard default if provided)
       if (episodeData.background) setBackground(episodeData.background);
 
       playScene(0);
@@ -39,15 +37,12 @@ function playScene(index) {
 
   const scene = episodeData.scenes[index];
 
-  // Background
   if (scene.background) setBackground(scene.background);
   else if (episodeData.background) setBackground(episodeData.background);
 
-  // Character states (placeholders until sprite engine is wired)
   setDrColi(scene.drColi?.animation || 'idle');
   setBori(scene.bori?.animation || 'idle');
 
-  // Dialogue lines
   const lines = scene.drColi?.say || [];
   playDialogue(lines, () => {
     enableInteraction(scene.interaction || { type: 'none' });
@@ -56,7 +51,6 @@ function playScene(index) {
 
 function enableInteraction(interaction) {
   if (!interaction || interaction.type === 'none') {
-    // Auto-advance
     setTimeout(() => playScene(currentSceneIndex + 1), 700);
     return;
   }
@@ -106,7 +100,9 @@ function playDialogue(lines, onDone) {
 
     textEl.textContent = lines[i];
     i += 1;
-    setTimeout(next, 1200); // placeholder timing; later tie to audio duration
+
+    // Placeholder timing (later: audio duration)
+    setTimeout(next, 1200);
   };
 
   next();
@@ -119,12 +115,10 @@ function runEmojiInteraction(interaction) {
 
   if (!tray || slots.length !== 3) {
     console.warn('Emoji tray UI missing');
-    // fallback: just advance
     setTimeout(() => playScene(currentSceneIndex + 1), 700);
     return;
   }
 
-  // Fill emoji choices
   const choices = interaction.choices || ['🙂', '🙂', '🙂'];
   slots.forEach((btn, idx) => {
     btn.textContent = choices[idx] || '';
@@ -132,7 +126,6 @@ function runEmojiInteraction(interaction) {
     btn.onclick = null;
   });
 
-  // Show tray
   tray.classList.remove('hidden');
   tray.classList.add('active');
   tray.setAttribute('aria-hidden', 'false');
@@ -147,8 +140,7 @@ function runEmojiInteraction(interaction) {
       lockButtons();
 
       if (idx === correctIndex) {
-        // ✅ Correct
-        confettiBurst();
+        confettiBurstFullScreen();
 
         const lines = interaction.onCorrectSay || ['Great job!'];
         playDialogue(lines, () => {
@@ -156,7 +148,6 @@ function runEmojiInteraction(interaction) {
           setTimeout(() => playScene(currentSceneIndex + 1), 600);
         });
       } else {
-        // ❌ Wrong → say something and let them try again
         const lines = interaction.onWrongSay || ['Nice try! Let’s try again.'];
         playDialogue(lines, () => {
           unlockButtons();
@@ -169,9 +160,10 @@ function runEmojiInteraction(interaction) {
 function hideEmojiTray() {
   const tray = document.getElementById('emojiTray');
   if (!tray) return;
+
   tray.classList.remove('active');
   tray.setAttribute('aria-hidden', 'true');
-  // wait for slide-down animation before hiding completely
+
   setTimeout(() => tray.classList.add('hidden'), 250);
 }
 
@@ -185,7 +177,6 @@ function runMicInteraction(interaction) {
 
   mic.classList.remove('hidden');
 
-  // Optional prompt line if you want it:
   if (interaction.prompt) {
     playDialogue([interaction.prompt], () => {});
   }
@@ -197,10 +188,11 @@ function runMicInteraction(interaction) {
   };
 }
 
-// ---------- FX: Confetti ----------
-function confettiBurst() {
+// ---------- FX: Confetti (FULL SCREEN) ----------
+function confettiBurstFullScreen() {
   const fx = document.getElementById('fxLayer');
-  if (!fx) return;
+  const viewport = document.getElementById('viewport');
+  if (!fx || !viewport) return;
 
   const confettiFiles = [
     '/assets/ui/confetti-star.png',
@@ -210,39 +202,53 @@ function confettiBurst() {
     '/assets/ui/confetti-pink-twirl.png'
   ];
 
-  const count = 14;
+  const rect = viewport.getBoundingClientRect();
+  const count = 34; // more pieces for full-screen burst
+
   for (let i = 0; i < count; i++) {
     const img = document.createElement('img');
     img.src = confettiFiles[i % confettiFiles.length];
+
+    // Spawn across full width, slightly above top
+    const startX = Math.random() * rect.width;
+    const startY = -40 - Math.random() * 120;
+
+    const size = 18 + Math.random() * 34;
     img.style.position = 'absolute';
-    img.style.left = `${40 + Math.random() * 20}%`;
-    img.style.top = `${40 + Math.random() * 10}%`;
-    img.style.width = `${24 + Math.random() * 26}px`;
+    img.style.left = `${startX}px`;
+    img.style.top = `${startY}px`;
+    img.style.width = `${size}px`;
+    img.style.height = 'auto';
     img.style.opacity = '0.95';
-    img.style.transform = `translate(-50%, -50%) rotate(${Math.random() * 360}deg)`;
     img.style.pointerEvents = 'none';
 
-    const dx = (Math.random() - 0.5) * 500;
-    const dy = -200 - Math.random() * 250;
-    const rot = (Math.random() - 0.5) * 720;
+    // Motion: drift sideways + fall down
+    const driftX = (Math.random() - 0.5) * 260;
+    const endY = rect.height + 120 + Math.random() * 180;
+
+    const rot0 = Math.random() * 360;
+    const rot1 = rot0 + (Math.random() - 0.5) * 1080;
+
+    fx.appendChild(img);
 
     img.animate(
       [
-        { transform: img.style.transform, offset: 0 },
-        { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${rot}deg)`, opacity: 1, offset: 0.65 },
-        { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy + 260}px)) rotate(${rot * 1.2}deg)`, opacity: 0, offset: 1 }
+        { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: 1 },
+        { transform: `translate(${driftX}px, ${endY * 0.55}px) rotate(${rot1 * 0.7}deg)`, opacity: 1 },
+        { transform: `translate(${driftX * 1.2}px, ${endY}px) rotate(${rot1}deg)`, opacity: 0 }
       ],
-      { duration: 950 + Math.random() * 450, easing: 'cubic-bezier(.2,.8,.2,1)' }
+      {
+        duration: 1400 + Math.random() * 700,
+        easing: 'cubic-bezier(.2,.8,.2,1)'
+      }
     );
 
-    fx.appendChild(img);
-    setTimeout(() => img.remove(), 1600);
+    setTimeout(() => img.remove(), 2400);
   }
 }
 
 // ---------- Helpers ----------
 function hideAllUI() {
-  // Hide tray
   const tray = document.getElementById('emojiTray');
   if (tray) {
     tray.classList.remove('active');
@@ -250,7 +256,6 @@ function hideAllUI() {
     tray.setAttribute('aria-hidden', 'true');
   }
 
-  // Hide mic
   const mic = document.getElementById('micButton');
   if (mic) {
     mic.classList.add('hidden');
@@ -264,6 +269,6 @@ function setBackground(filename) {
   bgLayer.style.backgroundImage = `url("/assets/backgrounds/${filename}")`;
 }
 
-// Placeholder stubs (sprites later)
+// Placeholder stubs (sprite engine comes later)
 function setDrColi(state) {}
 function setBori(state) {}
