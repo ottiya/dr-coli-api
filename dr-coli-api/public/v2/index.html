@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dr. Coli — Episode One</title>
 
-    <!-- Fonts (optional but nice) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,50 +12,42 @@
       rel="stylesheet"
     />
 
-    <!-- Your CSS -->
     <link rel="stylesheet" href="./v2.css" />
   </head>
 
   <body>
-    <!-- APP ROOT -->
     <div id="app">
-      <!-- BACKGROUND LAYER (image set by setBackground()) -->
-      <div id="bgLayer"></div>
+      <div id="viewport">
+        <div id="bgLayer"></div>
+        <div id="stageLayer"></div>
 
-      <!-- CANVAS / RENDER LAYER (Pixi / sprite renderer lives here) -->
-      <div id="stageLayer">
-        <!-- If you're using a canvas, your JS can append it here -->
-        <!-- Example: document.getElementById('stageLayer').appendChild(app.view); -->
-      </div>
+        <div id="uiLayer">
+          <!-- Dialogue Bubble -->
+          <div id="dialogue" class="dialogue">
+            <img src="/assets/ui/dialogue-bubble.png" alt="" />
+            <p id="dialogueText"></p>
+          </div>
 
-      <!-- UI LAYER -->
-      <div id="uiLayer">
-        <!-- Dialogue Bubble -->
-        <div id="dialogue" class="dialogue">
-          <img src="/assets/ui/dialogue-bubble.png" alt="" />
-          <p id="dialogueText"></p>
+          <!-- Emoji Tray -->
+          <div id="emojiTray" class="emoji-tray hidden" aria-hidden="true">
+            <img src="/assets/ui/emoji-tray.png" alt="" />
+            <button class="emoji-slot" data-idx="0" aria-label="Emoji option 1"></button>
+            <button class="emoji-slot" data-idx="1" aria-label="Emoji option 2"></button>
+            <button class="emoji-slot" data-idx="2" aria-label="Emoji option 3"></button>
+          </div>
+
+          <!-- Mic -->
+          <button id="micButton" class="mic hidden" aria-label="Speak">
+            <img src="/assets/ui/mic-button.png" alt="" />
+          </button>
+
+          <!-- FX -->
+          <div id="fxLayer" class="fx-layer" aria-hidden="true"></div>
         </div>
 
-        <!-- Emoji Tray (hidden by default; JS toggles .active / .hidden) -->
-        <div id="emojiTray" class="emoji-tray hidden" aria-hidden="true">
-          <img src="/assets/ui/emoji-tray.png" alt="" />
-          <!-- Slots sit on top of the tray image -->
-          <button class="emoji-slot" data-idx="0" aria-label="Emoji option 1"></button>
-          <button class="emoji-slot" data-idx="1" aria-label="Emoji option 2"></button>
-          <button class="emoji-slot" data-idx="2" aria-label="Emoji option 3"></button>
-        </div>
-
-        <!-- Mic Button (hidden by default; JS toggles .hidden) -->
-        <button id="micButton" class="mic hidden" aria-label="Speak">
-          <img src="/assets/ui/mic-button.png" alt="" />
-        </button>
-
-        <!-- Optional: Confetti container (JS spawns confetti pieces inside) -->
-        <div id="fxLayer" class="fx-layer" aria-hidden="true"></div>
       </div>
     </div>
 
-    <!-- Your JS -->
     <script src="./v2.js"></script>
   </body>
 </html>
