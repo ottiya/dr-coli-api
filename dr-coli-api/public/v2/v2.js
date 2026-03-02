@@ -1,4 +1,4 @@
-/* v2.js — episode engine + full-screen confetti (top->bottom, long, remove at bottom) */
+/* v2.js — episode engine + CONFETTI FIXED (top → bottom, smaller, longer) */
 
 let currentSceneIndex = 0;
 let episodeData = null;
@@ -16,7 +16,7 @@ const micButton = document.getElementById('micButton');
 const fxLayer = document.getElementById('fxLayer');
 const viewport = document.getElementById('viewport');
 
-// Confetti assets you already have
+// Confetti assets
 const CONFETTI_ASSETS = [
   '/assets/ui/confetti-blue-ribbon.png',
   '/assets/ui/confetti-golden-ribbon.png',
@@ -25,59 +25,40 @@ const CONFETTI_ASSETS = [
   '/assets/ui/confetti-star.png',
 ];
 
-// Load episode JSON
+// Load episode
 fetch('/lessons/episode-01.json')
-  .then(res => {
-    if (!res.ok) throw new Error(`Failed to load episode JSON: ${res.status}`);
-    return res.json();
-  })
+  .then(res => res.json())
   .then(data => {
     episodeData = data;
     playScene(0);
-  })
-  .catch(err => console.error(err));
+  });
 
 function playScene(index) {
   currentSceneIndex = index;
-
-  if (!episodeData || !episodeData.scenes || !episodeData.scenes[index]) {
-    console.error('Scene not found:', index);
-    return;
-  }
+  if (!episodeData?.scenes?.[index]) return;
 
   const scene = episodeData.scenes[index];
 
-  // Reset UI each scene
   hideEmojiTray();
   hideMic();
   clearFX();
 
-  // Background
   setBackground(scene.background || 'bg-puppies.png');
 
-  // Dialogue lines
-  const lines = scene.drColi?.say || [];
-  playDialogue(lines, () => {
+  playDialogue(scene.drColi?.say || [], () => {
     enableInteraction(scene.interaction || { type: 'none' });
   });
 }
 
-/* =========================
-   Background
-========================= */
+/* ================= Background ================= */
 function setBackground(bgFile) {
-  const path = bgFile.startsWith('/assets/')
-    ? bgFile
-    : `/assets/backgrounds/${bgFile}`;
-
-  bgLayer.style.backgroundImage = `url("${path}")`;
+  bgLayer.style.backgroundImage =
+    `url("/assets/backgrounds/${bgFile}")`;
 }
 
-/* =========================
-   Dialogue
-========================= */
+/* ================= Dialogue ================= */
 function playDialogue(lines, done) {
-  if (!lines || lines.length === 0) {
+  if (!lines.length) {
     hideDialogue();
     done?.();
     return;
@@ -88,14 +69,10 @@ function playDialogue(lines, done) {
 
   const advance = () => {
     if (i >= lines.length) {
-      setTimeout(() => done?.(), 250);
+      setTimeout(done, 300);
       return;
     }
-
-    dialogueText.textContent = lines[i];
-    i += 1;
-
-    // Auto-advance timing (later tie to audio)
+    dialogueText.textContent = lines[i++];
     setTimeout(advance, 1400);
   };
 
@@ -109,95 +86,67 @@ function hideDialogue() {
   dialogue.classList.remove('active');
 }
 
-/* =========================
-   Interaction routing
-========================= */
+/* ================= Interaction ================= */
 function enableInteraction(interaction) {
   if (!interaction || interaction.type === 'none') {
     setTimeout(() => playScene(currentSceneIndex + 1), 700);
     return;
   }
-
-  if (interaction.type === 'emoji') {
-    showEmojiTray(interaction);
-    return;
-  }
-
-  if (interaction.type === 'mic') {
-    showMic(interaction);
-    return;
-  }
-
-  setTimeout(() => playScene(currentSceneIndex + 1), 700);
+  if (interaction.type === 'emoji') return showEmojiTray(interaction);
+  if (interaction.type === 'mic') return showMic();
 }
 
-/* =========================
-   Emoji Tray
-========================= */
+/* ================= Emoji ================= */
 function showEmojiTray(interaction) {
   emojiTray.classList.add('active');
-  emojiTray.setAttribute('aria-hidden', 'false');
 
-  const choices = interaction.choices || ['🙇‍♀️', '👋', '🏃‍♀️'];
-  const correctIndex = typeof interaction.correctIndex === 'number' ? interaction.correctIndex : 0;
+  const choices = interaction.choices || [];
+  const correct = interaction.correctIndex ?? 0;
 
-  emojiSlots.forEach((btn, idx) => {
-    btn.textContent = choices[idx] ?? '';
+  emojiSlots.forEach((btn, i) => {
+    btn.textContent = choices[i] || '';
     btn.disabled = false;
-    btn.onclick = null;
-    btn.onclick = () => handleEmojiPick(idx, correctIndex, interaction);
+    btn.onclick = () => handleEmojiPick(i, correct, interaction);
   });
 }
 
 function hideEmojiTray() {
   emojiTray.classList.remove('active');
-  emojiTray.setAttribute('aria-hidden', 'true');
-  emojiSlots.forEach(btn => {
-    btn.onclick = null;
-    btn.disabled = true;
-    btn.textContent = '';
+  emojiSlots.forEach(b => {
+    b.disabled = true;
+    b.textContent = '';
+    b.onclick = null;
   });
 }
 
-function handleEmojiPick(pickedIdx, correctIdx, interaction) {
+function handleEmojiPick(idx, correctIdx, interaction) {
   emojiSlots.forEach(b => (b.disabled = true));
 
-  if (pickedIdx === correctIdx) {
-    // ✅ Full-screen confetti (top->bottom, long)
+  if (idx === correctIdx) {
     playConfettiTopToBottom();
 
-    const praise = interaction.praise || 'Yes! Great job!';
+    dialogueText.textContent =
+      interaction.praise || 'Yes! Great job!';
     showDialogue();
-    dialogueText.textContent = praise;
 
-    // Let kids actually SEE the celebration
-    setTimeout(() => {
-      hideEmojiTray();
-      playScene(currentSceneIndex + 1);
-    }, 2200);
-
+    setTimeout(() => playScene(currentSceneIndex + 1), 2400);
   } else {
-    const retry = interaction.retry || 'Nice try! Let’s try again.';
+    dialogueText.textContent =
+      interaction.retry || 'Nice try! Let’s try again.';
     showDialogue();
-    dialogueText.textContent = retry;
 
     setTimeout(() => {
       emojiSlots.forEach(b => (b.disabled = false));
-    }, 650);
+    }, 700);
   }
 }
 
-/* =========================
-   Mic
-========================= */
-function showMic(interaction) {
+/* ================= Mic ================= */
+function showMic() {
   micButton.classList.remove('hidden');
-
-  micButton.onclick = null;
   micButton.onclick = () => {
     micButton.classList.add('hidden');
-    micButton.onclick = null;
-    setTimeout(() => playScene(currentSceneIndex + 1), 250);
+    playScene(currentSceneIndex + 1);
   };
 }
 
@@ -206,65 +155,53 @@ function hideMic() {
   micButton.onclick = null;
 }
 
-/* =========================
-   Confetti: TOP -> BOTTOM, long, remove at bottom
-========================= */
+/* ================= CONFETTI (FIXED) ================= */
 function playConfettiTopToBottom() {
-  if (!fxLayer || !viewport) return;
-
-  // Use the real viewport dimensions (not the window)
   const w = viewport.clientWidth;
   const h = viewport.clientHeight;
 
-  const pieceCount = 42;          // more pieces, full-screen feel
-  const minDur = 4200;            // 4.2s
-  const maxDur = 6200;            // 6.2s
+  const COUNT = 36;
+  const MIN_DUR = 4200;
+  const MAX_DUR = 6000;
+  const SCALE = 0.35; // 👈 35% size
 
-  for (let i = 0; i < pieceCount; i++) {
+  for (let i = 0; i < COUNT; i++) {
     const img = document.createElement('img');
     img.className = 'confetti-piece';
-    img.alt = '';
-
     img.src = CONFETTI_ASSETS[Math.floor(Math.random() * CONFETTI_ASSETS.length)];
 
-    const size = 22 + Math.random() * 40;        // 22..62px
-    const startX = Math.random() * w;            // anywhere across width
-    const startY = - (60 + Math.random() * 180); // above the top edge
-    const endY = h + 200;                        // past bottom edge
-    const driftX = (Math.random() - 0.5) * 280;  // sideways drift
+    const baseSize = 60 + Math.random() * 40;
+    const size = baseSize * SCALE;
 
-    const rot0 = Math.random() * 360;
-    const rot1 = rot0 + (Math.random() - 0.5) * 1400;
+    const startX = Math.random() * w;
+    const startY = -size - Math.random() * 150;
+    const endY = h + size + 120;
+    const driftX = (Math.random() - 0.5) * 240;
 
-    const dur = minDur + Math.random() * (maxDur - minDur);
-    const delay = Math.random() * 250;           // tiny stagger
+    const rotStart = Math.random() * 360;
+    const rotEnd = rotStart + (Math.random() - 0.5) * 1200;
+
+    const duration = MIN_DUR + Math.random() * (MAX_DUR - MIN_DUR);
 
     img.style.width = `${size}px`;
     img.style.left = `${startX}px`;
     img.style.top = `${startY}px`;
-    img.style.opacity = '1';
 
     fxLayer.appendChild(img);
 
-    // Animate with Web Animations API so we can remove exactly at bottom
     const anim = img.animate(
       [
-        { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: 1 },
-        { transform: `translate(${driftX}px, ${endY * 0.85}px) rotate(${rot1 * 0.7}deg)`, opacity: 1 },
-        // Fade only at the very end (so it stays visible)
-        { transform: `translate(${driftX * 1.2}px, ${endY}px) rotate(${rot1}deg)`, opacity: 0 }
+        { transform: `translate(0, 0) rotate(${rotStart}deg)`, opacity: 1 },
+        { transform: `translate(${driftX}px, ${endY}px) rotate(${rotEnd}deg)`, opacity: 1 },
       ],
       {
-        duration: dur,
-        delay,
+        duration,
         easing: 'linear',
-        fill: 'forwards'
+        fill: 'forwards',
       }
     );
 
-    anim.onfinish = () => {
-      img.remove();
-    };
+    anim.onfinish = () => img.remove();
   }
 }
 
