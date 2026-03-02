@@ -21,12 +21,12 @@
         <!-- Background -->
         <div id="bgLayer" aria-hidden="true"></div>
 
-        <!-- Characters (wire sprites later) -->
+        <!-- Characters (Pixi will render into this div) -->
         <div id="stageLayer" aria-hidden="true"></div>
 
         <!-- UI -->
         <div id="uiLayer">
-          <!-- 🔊 Audio gate: tap anywhere (no big button) -->
+          <!-- 🔊 Audio gate -->
           <div id="audioGate" class="audio-gate" aria-hidden="false">
             <div class="audio-hint">Tap anywhere to start 🔊</div>
           </div>
@@ -55,6 +55,9 @@
         </div>
       </div>
     </div>
+
+    <!-- PixiJS (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js"></script>
 
     <script src="/v2/v2.js"></script>
   </body>
