@@ -46,11 +46,38 @@ body {
   pointer-events: none;
 }
 
+/* IMPORTANT: must be clickable for the audio gate + buttons */
 #uiLayer {
   position: absolute;
   inset: 0;
   z-index: 20;
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+/* ====== Audio Gate ====== */
+.audio-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 999;
+  pointer-events: auto;
+  background: rgba(0,0,0,0.10); /* subtle */
+  display: grid;
+  place-items: center;
+}
+
+.audio-gate.hidden {
+  display: none !important;
+}
+
+.audio-hint {
+  background: rgba(255,255,255,0.92);
+  color: #222;
+  padding: 14px 18px;
+  border-radius: 18px;
+  font-weight: 900;
+  font-size: 22px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.20);
+  user-select: none;
 }
 
 /* ====== Dialogue ====== */
@@ -102,21 +129,18 @@ body {
   transform: translate(-50%, -50%);
   width: 112px;
   height: 112px;
-
   display: grid;
   place-items: center;
-
   background: transparent;
   border: none;
   cursor: pointer;
-
   font-size: 64px;
   line-height: 1;
   padding: 0;
   margin: 0;
 }
 
-/* ✅ Your tuned numbers */
+/* Your tuned numbers */
 .emoji-slot[data-idx="0"] { left: 33%; }
 .emoji-slot[data-idx="1"] { left: 49%; }
 .emoji-slot[data-idx="2"] { left: 67%; }
@@ -141,41 +165,10 @@ body {
 .fx-layer {
   position: absolute;
   inset: 0;
-  z-index: 60;           /* above everything */
+  z-index: 60;
   pointer-events: none;
   overflow: hidden;
 }
 
-/* confetti pieces (JS animates them) */
-.confetti-piece {
-  position: absolute;
-  will-change: transform, opacity;
-  pointer-events: none;
-  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.16));
-}
-
 /* ====== Helpers ====== */
 .hidden { display: none !important; }
-
-.audio-gate{
-  position:absolute;
-  inset:0;
-  display:grid;
-  place-items:center;
-  background: rgba(0,0,0,0.25);
-  z-index: 999;
-  pointer-events: auto;
-}
-.audio-gate.hidden{ display:none !important; }
-
-.start-audio{
-  width: 360px;
-  height: 90px;
-  border: none;
-  border-radius: 24px;
-  font-size: 28px;
-  font-weight: 900;
-  cursor: pointer;
-  font-family: 'Nunito', system-ui, sans-serif;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-}
