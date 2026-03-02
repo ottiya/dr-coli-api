@@ -1,26 +1,184 @@
-#dialogue {
+/* =========================
+   GLOBAL RESET / APP LAYERS
+   ========================= */
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow: hidden;
+  font-family: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #000;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* =========================
+   BACKGROUND LAYER
+   ========================= */
+
+#bgLayer {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+}
+
+/* =========================
+   STAGE / CHARACTER LAYER
+   ========================= */
+
+#stageLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* =========================
+   UI LAYER
+   ========================= */
+
+#uiLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* =========================
+   DIALOGUE BUBBLE
+   ========================= */
+
+.dialogue {
   position: absolute;
   left: 50%;
   bottom: 220px;
   transform: translateX(-50%);
-  z-index: 20;
+  width: 900px;
+  height: 140px;
+  display: none;
+  z-index: 30;
+  pointer-events: none;
 }
 
-#emojiTray {
+.dialogue.active {
+  display: block;
+}
+
+.dialogue img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#dialogueText {
+  position: absolute;
+  left: 52px;
+  right: 52px;
+  top: 28px;
+  margin: 0;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #2b2b2b;
+  text-align: left;
+  user-select: none;
+}
+
+/* =========================
+   EMOJI TRAY
+   ========================= */
+
+.emoji-tray {
   position: absolute;
   left: 50%;
-  bottom: -200px; /* hidden */
+  bottom: -220px; /* hidden off-screen */
   transform: translateX(-50%);
+  width: 720px;
+  height: 160px;
   transition: bottom 0.4s ease;
+  z-index: 25;
+  pointer-events: auto;
 }
 
-#emojiTray.active {
+.emoji-tray.active {
   bottom: 40px;
 }
 
-#micButton {
+.emoji-tray img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Emoji slots positioned over tray */
+.emoji-slot {
+  position: absolute;
+  top: 20px;
+  width: 120px;
+  height: 120px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 72px;
+  line-height: 1;
+}
+
+/* Slot positions */
+.emoji-slot[data-idx="0"] { left: 80px; }
+.emoji-slot[data-idx="1"] { left: 300px; }
+.emoji-slot[data-idx="2"] { left: 520px; }
+
+/* =========================
+   MIC BUTTON
+   ========================= */
+
+.mic {
   position: absolute;
   right: 40px;
   bottom: 40px;
-  z-index: 25;
+  width: 96px;
+  height: 96px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+.mic img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* =========================
+   CONFETTI / FX LAYER
+   ========================= */
+
+.fx-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+/* =========================
+   HELPERS
+   ========================= */
+
+.hidden {
+  display: none !important;
 }
