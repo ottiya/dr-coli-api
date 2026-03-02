@@ -26,11 +26,9 @@
 
         <!-- UI -->
         <div id="uiLayer">
-          <!-- 🔊 Tap-to-start gate (REQUIRED for audio) -->
-          <div id="audioGate" class="audio-gate">
-            <button id="startAudioBtn" class="start-audio">
-              Tap to start 🔊
-            </button>
+          <!-- 🔊 Audio gate: tap anywhere (no big button) -->
+          <div id="audioGate" class="audio-gate" aria-hidden="false">
+            <div class="audio-hint">Tap anywhere to start 🔊</div>
           </div>
 
           <!-- Dialogue -->
