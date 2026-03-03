@@ -24,7 +24,7 @@
   // STT
   const STT_MODEL = "gpt-4o-mini-transcribe";
   const STT_LANGUAGE = "ko";
-  const RECORD_MS = 2600;
+  const RECORD_MS = 2200;
   const SPEECH_RMS_THRESHOLD = 0.04;
   const MIN_SPEECH_MS = 140;
 
@@ -684,21 +684,30 @@
           return;
         }
 
-        // 🟡 Processing state (slow glow) AFTER the kid spoke
-        micButtonEl.classList.add("processing");
+        // Start STT/check immediately (overlaps with “One moment!”)
+const checkPromise = listenAndCheckPhrase(targets, strictness, blob);
 
-        dialogueEl.classList.add("active");
-        dialogueTextEl.textContent = "One moment!";
+// Show processing UI
+micButtonEl.classList.add("processing");
+dialogueEl.classList.add("active");
+dialogueTextEl.textContent = "One moment!";
 
-        await setDrColi("talk").catch(() => {});
-        await speakLine("One moment!");
-        await setDrColi("idle").catch(() => {});
+// Speak while STT runs
+await setDrColi("talk").catch(() => {});
+const oneMomentPromise = speakLine("One moment!");
 
-        // Ensure processing UI stays visible at least 600ms
-        const minProcessingTime = sleep(600);
+// Keep it visible at least a little
+const minProcessingTime = sleep(350);
 
-        const checkPromise = listenAndCheckPhrase(targets, strictness, blob);
-        const [result] = await Promise.all([checkPromise, minProcessingTime]);
+// Wait for STT + minimum UI time + the “One moment!” voice
+const [result] = await Promise.all([
+  checkPromise,
+  minProcessingTime,
+  oneMomentPromise,
+]).then(([r]) => [r]);
+
+await setDrColi("idle").catch(() => {});
+micButtonEl.classList.remove("processing");
 
         // Remove processing glow
         micButtonEl.classList.remove("processing");
