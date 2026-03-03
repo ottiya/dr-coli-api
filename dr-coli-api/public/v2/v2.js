@@ -819,54 +819,39 @@
     setBori(prevBori || "idle").catch(() => {});
   }
 
-  function spawnImageConfettiCool() {
-  // Two waves for a more “celebration” feel
-  spawnWave(32, 0);
-  spawnWave(26, 220);
-
-  function spawnWave(count, delayMs) {
+  function spawnImageConfetti() {
+    const N = 45;
     const w = fxLayerEl.clientWidth || window.innerWidth;
     const h = fxLayerEl.clientHeight || window.innerHeight;
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < N; i++) {
       const img = document.createElement("img");
       img.src = CONFETTI_IMAGES[(Math.random() * CONFETTI_IMAGES.length) | 0];
       img.alt = "";
       img.style.position = "absolute";
-      img.style.left = (Math.random() * w) + "px";
-      img.style.top = (-60 - Math.random() * 120) + "px";
-
-      // size ~20% of 120px, but with variety
-      const size = 16 + Math.random() * 16; // 16–32px
-      img.style.width = size + "px";
+      img.style.left = Math.random() * w + "px";
+      img.style.top = (-40 - Math.random() * 60) + "px";
+      img.style.width = (18 + Math.random() * 12) + "px"; // ~20% of 120px
       img.style.height = "auto";
-      img.style.opacity = "0.98";
+      img.style.opacity = "0.95";
       img.style.zIndex = "100";
       img.style.pointerEvents = "none";
       fxLayerEl.appendChild(img);
 
-      const drift = (Math.random() - 0.5) * 320;
-      const sway = (Math.random() - 0.5) * 140;
-      const dur = 1800 + Math.random() * 2600; // slower + varied
+      const drift = (Math.random() - 0.5) * 280;
+      const dur = 1200 + Math.random() * 900;
       const rot0 = Math.random() * 360;
-      const rot1 = rot0 + (Math.random() * 420 + 240);
-      const rot2 = rot1 + (Math.random() * 420 + 240);
+      const rot1 = rot0 + (Math.random() * 720 + 360);
 
-      const startDelay = delayMs + Math.random() * 180;
+      img.animate(
+        [
+          { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: 1 },
+          { transform: `translate(${drift}px, ${h + 80}px) rotate(${rot1}deg)`, opacity: 0.98 }
+        ],
+        { duration: dur, easing: "cubic-bezier(.2,.6,.2,1)", fill: "forwards" }
+      );
 
-      setTimeout(() => {
-        img.animate(
-          [
-            { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: 1 },
-            { transform: `translate(${drift * 0.35 + sway}px, ${(h + 80) * 0.45}px) rotate(${rot1}deg)`, opacity: 1 },
-            { transform: `translate(${drift}px, ${h + 120}px) rotate(${rot2}deg)`, opacity: 0.99 }
-          ],
-          { duration: dur, easing: "cubic-bezier(.18,.7,.2,1)", fill: "forwards" }
-        );
-
-        setTimeout(() => img.remove(), dur + 220);
-      }, startDelay);
+      setTimeout(() => img.remove(), dur + 200);
     }
   }
-}
 })();
