@@ -1,53 +1,32 @@
-/* public/v2/v2.js
-   - Pixi v7 animated characters (Dr. Coli + Bori)
-   - Episode JSON scenes with dialogue + interactions (mic + emoji)
-   - ElevenLabs TTS via /api/tts-elevenlabs
-   - OpenAI STT via /api/stt (multipart)
-   - Confetti upgraded ONLY (slower, varied, sway, two waves)
-*/
+/* public/v2/v2.js */
+/* Pixi v7 + lazy-load sheets + ElevenLabs TTS + OpenAI STT mic check (kid-forgiving) */
 
 (() => {
-  // prevent double-boot
   if (window.__DRCOLI_V2_BOOTED__) return;
   window.__DRCOLI_V2_BOOTED__ = true;
 
-  // ===== Config =====
+  // ===== Constants =====
   const DEFAULT_BG = "/assets/backgrounds/bg-puppies.png";
   const EPISODE_URL = "/lessons/episode-01.json";
   const CHARACTER_MANIFEST_URL = "/assets/characters.manifest.json";
 
   // TTS
-  const TTS_RATE = 1.25;
-  const BETWEEN_LINES_MS = 80;
+  const TTS_RATE = 1.25;           // faster speaking
+  const BETWEEN_LINES_MS = 80;     // less delay between lines
+
+  // ===== Sound Effects (public/assets/sound-effects) =====
+  const SFX_INTRO = "/assets/sound-effects/ottiya-korean-intro-song.wav";
+  const SFX_CORRECT = "/assets/sound-effects/correct-sound-effect.wav";
+  const SFX_KIDS_HOORAY = "/assets/sound-effects/kids-hooray.wav";
+  const SFX_KIDS_YAY = "/assets/sound-effects/kids-yay.wav";
+  const SFX_MIC_POP = "/assets/sound-effects/kids-giggle.wav"; // subtle “pop” substitute at low volume
 
   // STT
   const STT_MODEL = "gpt-4o-mini-transcribe";
   const STT_LANGUAGE = "ko";
   const RECORD_MS = 2600;
 
-  // Animation
-  const DEFAULT_ANIM_SPEED = 0.22;
-
-  // Bori behavior
-  const BORIS_LOOK_DURING_SPEECH = 0.20;   // 20%
-  const BORIS_LOOK_DURING_DOWNTIME = 0.10; // 10%
-  const BORIS_DOWNTIME_REROLL_MS_MIN = 1600;
-  const BORIS_DOWNTIME_REROLL_MS_MAX = 3200;
-
-  // Positioning (simple + stable; you can tweak these later)
-  const CHAR_SCALE_MIN = 0.30;
-  const CHAR_SCALE_MAX = 0.62;
-  const GAP_MIN = 140;
-  const GAP_MAX = 360;
-  const GROUND_MARGIN_RATIO = 0.028;
-  const GROUND_MARGIN_MIN = 14;
-  const GROUND_MARGIN_MAX = 34;
-
-  // Optional small offsets (feet alignment)
-  const DRCOLI_Y_OFFSET = 0;
-  const BORI_Y_OFFSET = 10;
-
-  // Confetti assets (make sure these exist in public/assets/ui/)
+  // ===== Confetti images =====
   const CONFETTI_IMAGES = [
     "/assets/ui/confetti-blue-ribbon.png",
     "/assets/ui/confetti-golden-ribbon.png",
@@ -72,16 +51,25 @@
   // DOM
   let bgLayer, dialogueEl, dialogueTextEl, emojiTrayEl, micButtonEl, fxLayerEl, stageLayerEl;
 
-  // gating
+  // Audio unlock gate
   let userInteracted = false;
   let unlockPromise = null;
-  let micPrewarmed = false;
-  let interactionActive = false;
 
-  // downtime
-  let boriDowntimeTimer = null;
+  // ===== SFX / Music objects =====
+  let introMusic = null;
+  let correctSfx = null;
+  let kidsHooraySfx = null;
+  let kidsYaySfx = null;
+  let micPopSfx = null;
 
-  // ===== Boot =====
+  // Music start gating
+  let assetsReadyToStart = false;
+  let introSequenceDone = false;
+
+  // Volume ducking
+  const DUCKED_MUSIC_VOL = 0.22;
+  const NORMAL_MUSIC_VOL = 0.6;
+
   document.addEventListener("DOMContentLoaded", () => {
     bgLayer = document.getElementById("bgLayer");
     dialogueEl = document.getElementById("dialogue");
@@ -92,11 +80,12 @@
     stageLayerEl = document.getElementById("stageLayer");
 
     if (!bgLayer || !dialogueEl || !dialogueTextEl || !emojiTrayEl || !micButtonEl || !fxLayerEl || !stageLayerEl) {
-      console.error("Missing DOM elements. Need: bgLayer, stageLayer, dialogue, dialogueText, emojiTray, micButton, fxLayer.");
+      console.error("Missing required DOM elements. Check index.html for: bgLayer, stageLayer, UI elements.");
       return;
     }
 
     applyDialogueLayoutFix();
+    initSfx();
     ensureStartOverlay();
 
     boot().catch(err => console.error("BOOT ERROR:", err));
@@ -106,28 +95,58 @@
     setBackground(DEFAULT_BG);
     initPixi();
 
+    // Pixi v7 Assets init
     if (PIXI.Assets?.init) {
       await PIXI.Assets.init({ manifest: null }).catch(() => {});
     }
 
+    // Load episode + manifest in parallel
     const [ep, man] = await Promise.all([
-      fetchJSON(EPISODE_URL),
-      fetchJSON(CHARACTER_MANIFEST_URL),
+      fetchJSON(EPISODE_URL), fetchJSON(CHARACTER_MANIFEST_URL),
     ]);
 
     episodeData = ep;
+
+    // Support either:
+    // { drColi: {...}, bori: {...} } OR { "drColi": {...}, "bori": {...} } OR { drColi:... } etc.
     characterManifest = normalizeManifest(man);
 
-    // preload minimal states for faster start
+    // Fast boot: load minimum states only
     await Promise.all([
       ensureStateLoaded("drColi", "idle"),
       ensureStateLoaded("bori", "idle"),
+      // prewarm common ones (optional)
       ensureStateLoaded("drColi", "talk").catch(() => {}),
       ensureStateLoaded("bori", "look").catch(() => {}),
     ]);
 
     createCharacters();
+    assetsReadyToStart = true;
+    maybeStartEpisode();
+  }
+
+  function maybeStartEpisode() {
+    // Start only after assets are ready AND the intro sequence finished.
+    if (!assetsReadyToStart) return;
+    if (!introSequenceDone) return;
+
+    // Prevent double-start
+    if (maybeStartEpisode.__started) return;
+    maybeStartEpisode.__started = true;
+
     playScene(0);
+  }
+
+  function normalizeManifest(man) {
+    // If someone wraps inside { drColi: ..., bori: ... } we're good.
+    // If it’s { "drColi":..., "bori":... } we're good.
+    // If it's { "DrColi":... } etc, we fallback with best effort.
+    const out = { drColi: null, bori: null };
+
+    out.drColi = man?.drColi || man?.DrColi || man?.drcoli || man?.["dr-coli"] || man?.["dr_coli"] || null;
+    out.bori = man?.bori || man?.Bori || null;
+
+    return (out.drColi || out.bori) ? out : man;
   }
 
   function initPixi() {
@@ -155,8 +174,8 @@
 
     positionCharacters();
 
-    playCharacterState(drColiSprite, drIdle, { speed: DEFAULT_ANIM_SPEED, pingpong: true });
-    playCharacterState(boriSprite, boriIdle, { speed: DEFAULT_ANIM_SPEED, pingpong: true });
+    playCharacterState(drColiSprite, drIdle, { speed: 0.22, pingpong: true });
+    playCharacterState(boriSprite, boriIdle, { speed: 0.22, pingpong: true });
   }
 
   function positionCharacters() {
@@ -165,25 +184,24 @@
     const w = pixiApp.renderer.width;
     const h = pixiApp.renderer.height;
 
-    const scale = clamp(w / 1200, CHAR_SCALE_MIN, CHAR_SCALE_MAX);
+    const scale = clamp(Math.min(w / 1200, h / 675), 0.30, 0.62);
     drColiSprite.scale.set(scale);
     boriSprite.scale.set(scale);
 
-    const margin = clamp(h * GROUND_MARGIN_RATIO, GROUND_MARGIN_MIN, GROUND_MARGIN_MAX);
+    const margin = clamp(h * 0.028, 14, 34);
     const groundY = h - margin;
 
-    const gap = clamp(w * 0.18, GAP_MIN, GAP_MAX);
+    const gap = clamp(w * 0.18, 140, 360);
     const cx = w * 0.5;
 
     drColiSprite.x = cx - gap / 2;
     boriSprite.x = cx + gap / 2;
 
-    drColiSprite.y = groundY + DRCOLI_Y_OFFSET;
-    boriSprite.y = groundY + BORI_Y_OFFSET;
+    drColiSprite.y = groundY + 0;
+    boriSprite.y = groundY + 10;
   }
 
-  // ===== Animation playback (smooth pingpong) =====
-  function playCharacterState(sprite, textures, { speed = DEFAULT_ANIM_SPEED, pingpong = true } = {}) {
+  function playCharacterState(sprite, textures, { speed = 0.22, pingpong = true } = {}) {
     if (!sprite) return;
     if (!textures || textures.length === 0) {
       sprite.stop();
@@ -197,7 +215,7 @@
       return;
     }
 
-    const abs = Math.abs(speed || DEFAULT_ANIM_SPEED);
+    const abs = Math.abs(speed || 0.22);
     sprite.loop = true;
     sprite._pingpong = !!pingpong;
     sprite._ppAbs = abs;
@@ -215,24 +233,13 @@
   async function setDrColi(state, opts = {}) {
     charState.drColi = state;
     await ensureStateLoaded("drColi", state);
-    playCharacterState(drColiSprite, textureCache.drColi[state], { speed: DEFAULT_ANIM_SPEED, pingpong: true, ...opts });
+    playCharacterState(drColiSprite, textureCache.drColi[state], { speed: 0.22, pingpong: true, ...opts });
   }
 
   async function setBori(state, opts = {}) {
     charState.bori = state;
     await ensureStateLoaded("bori", state);
-    playCharacterState(boriSprite, textureCache.bori[state], { speed: DEFAULT_ANIM_SPEED, pingpong: true, ...opts });
-  }
-
-  // ===== Loading =====
-  function normalizeManifest(man) {
-    if (!man || typeof man !== "object") return man;
-    if (man.drColi && man.bori) return man;
-
-    const out = {};
-    out.drColi = man.drColi || man.DrColi || man.drcoli || man["dr-coli"] || man["dr_coli"] || null;
-    out.bori = man.bori || man.Bori || null;
-    return (out.drColi || out.bori) ? out : man;
+    playCharacterState(boriSprite, textureCache.bori[state], { speed: 0.22, pingpong: true, ...opts });
   }
 
   async function ensureStateLoaded(characterKey, stateName) {
@@ -296,7 +303,6 @@
     return await res.json();
   }
 
-  // ===== Background =====
   function setBackground(bgFileOrUrl) {
     const url =
       bgFileOrUrl.startsWith("http") || bgFileOrUrl.startsWith("/")
@@ -305,11 +311,7 @@
     bgLayer.style.backgroundImage = `url("${url}")`;
   }
 
-  // ===== Dialogue flow =====
   function playScene(index) {
-    stopBoriDowntime();
-    interactionActive = false;
-
     currentSceneIndex = index;
     const scene = episodeData?.scenes?.[index];
     if (!scene) return;
@@ -330,78 +332,31 @@
       return;
     }
     showDialogue();
-    await drColiSay(lines);
-    done?.();
-  }
 
-  function showDialogue() {
-    dialogueEl.style.display = "block";
-  }
-
-  function hideDialogue() {
-    dialogueEl.style.display = "none";
-    dialogueTextEl.textContent = "";
-  }
-
-  async function setBoriDuringSpeech() {
-    if (interactionActive) {
-      await setBori("idle").catch(() => {});
-      return;
-    }
-    if (Math.random() < BORIS_LOOK_DURING_SPEECH) await setBori("look").catch(() => {});
-    else await setBori("idle").catch(() => {});
-  }
-
-  function startBoriDowntime() {
-    stopBoriDowntime();
-    if (interactionActive) return;
-
-    const reroll = async () => {
-      if (interactionActive) return;
-
-      if (Math.random() < BORIS_LOOK_DURING_DOWNTIME) await setBori("look").catch(() => {});
-      else await setBori("idle").catch(() => {});
-
-      const next = BORIS_DOWNTIME_REROLL_MS_MIN +
-        Math.random() * (BORIS_DOWNTIME_REROLL_MS_MAX - BORIS_DOWNTIME_REROLL_MS_MIN);
-
-      boriDowntimeTimer = setTimeout(reroll, next);
-    };
-
-    boriDowntimeTimer = setTimeout(reroll, 650 + Math.random() * 850);
-  }
-
-  function stopBoriDowntime() {
-    if (boriDowntimeTimer) clearTimeout(boriDowntimeTimer);
-    boriDowntimeTimer = null;
-  }
-
-  async function drColiSay(lines) {
-    stopBoriDowntime();
-    const arr = Array.isArray(lines) ? lines : [lines];
-    showDialogue();
-
-    for (const line of arr) {
+    for (const line of lines) {
       const msg = String(line ?? "").trim();
       if (!msg) continue;
 
       dialogueTextEl.textContent = msg;
-
       await setDrColi("talk").catch(() => {});
-      await setBoriDuringSpeech();
-
       await speakLine(msg);
+      await setDrColi("idle").catch(() => {});
       await sleep(BETWEEN_LINES_MS);
     }
 
-    await setDrColi("idle").catch(() => {});
-    if (!interactionActive) {
-      await setBori("idle").catch(() => {});
-      startBoriDowntime();
-    }
+    done?.();
   }
 
-  // ===== Audio gate / mic prewarm =====
+  function showDialogue() {
+    dialogueEl.classList.add("active");
+  }
+
+  function hideDialogue() {
+    dialogueEl.classList.remove("active");
+    dialogueTextEl.textContent = "";
+  }
+
+  // ===== Audio unlock overlay + intro music sequence =====
   function ensureStartOverlay() {
     if (document.getElementById("startOverlay")) return;
 
@@ -418,9 +373,9 @@
     overlay.style.textAlign = "center";
     overlay.style.padding = "24px";
     overlay.innerHTML = `
-      <div style="max-width:520px;">
-        <div style="font-size:28px;font-weight:900;margin-bottom:10px;">Tap to start</div>
-        <div style="font-size:16px;opacity:.9;">Enables audio + microphone.</div>
+      <div style="max-width: 520px;">
+        <div style="font-size: 28px; font-weight: 800; margin-bottom: 10px;">Tap to start</div>
+        <div style="font-size: 16px; opacity: 0.9;">We’ll play a quick intro, then begin.</div>
       </div>
     `;
 
@@ -428,25 +383,26 @@
       userInteracted = true;
       overlay.remove();
       await unlockAudioContext();
-      await prewarmMicPermission();
+
+      // Intro music: start → hold ~2s → fade out → start lesson
+      try {
+        if (introMusic) {
+          introMusic.currentTime = 0;
+          introMusic.volume = NORMAL_MUSIC_VOL;
+          await introMusic.play();
+        }
+      } catch {
+        // non-fatal
+      }
+
+      await sleep(2000);
+      await fadeOutAudio(introMusic, 900);
+
+      introSequenceDone = true;
+      maybeStartEpisode();
     }, { once: true });
 
     document.body.appendChild(overlay);
-  }
-
-  async function waitForUserInteraction() {
-    if (userInteracted) return;
-    if (!unlockPromise) {
-      unlockPromise = new Promise(resolve => {
-        const handler = () => {
-          userInteracted = true;
-          window.removeEventListener("pointerdown", handler);
-          resolve();
-        };
-        window.addEventListener("pointerdown", handler, { once: true });
-      });
-    }
-    await unlockPromise;
   }
 
   async function unlockAudioContext() {
@@ -462,27 +418,34 @@
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.01);
-    } catch {}
-  }
-
-  async function prewarmMicPermission() {
-    if (micPrewarmed) return true;
-    if (!navigator.mediaDevices?.getUserMedia) return false;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop());
-      micPrewarmed = true;
-      return true;
-    } catch (e) {
-      console.warn("Mic permission denied/unavailable:", e);
-      return false;
+    } catch {
+      // non-fatal
     }
   }
 
-  // ===== ElevenLabs TTS =====
+  async function waitForUserInteraction() {
+    if (userInteracted) return;
+    if (!unlockPromise) {
+      ensureStartOverlay();
+      unlockPromise = new Promise(resolve => {
+        const handler = () => {
+          userInteracted = true;
+          window.removeEventListener("pointerdown", handler);
+          resolve();
+        };
+        window.addEventListener("pointerdown", handler, { once: true });
+      });
+    }
+    await unlockPromise;
+  }
+
+  // ===== ElevenLabs TTS + ducking =====
   async function speakLine(text) {
     try {
       await waitForUserInteraction();
+
+      // Duck intro music so speech stays clear
+      duckMusicForSpeech(true);
 
       const res = await fetch("/api/tts-elevenlabs", {
         method: "POST",
@@ -490,45 +453,43 @@
         body: JSON.stringify({ text }),
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.warn("ElevenLabs TTS error:", res.status);
+        duckMusicForSpeech(false);
+        return;
+      }
 
-      const data = await res.json().catch(() => ({}));
+      const data = await res.json();
       const url = data?.url;
-      if (!url) return;
+      if (!url) {
+        duckMusicForSpeech(false);
+        return;
+      }
 
       const audio = new Audio(url);
       audio.playbackRate = TTS_RATE;
 
       await audio.play();
       await new Promise(resolve => {
-        audio.onended = resolve;
-        audio.onerror = resolve;
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
       });
+
+      duckMusicForSpeech(false);
     } catch (err) {
+      duckMusicForSpeech(false);
       console.warn("TTS playback failed (non-fatal):", err);
     }
   }
 
-  // ===== Interactions =====
+  // ===== Interaction handling =====
   function enableInteraction(interaction) {
     const type = interaction?.type || "none";
 
     // reset UI
     emojiTrayEl.classList.add("hidden");
-    emojiTrayEl.classList.remove("active");
     micButtonEl.classList.add("hidden");
-    micButtonEl.classList.remove("listening");
-    micButtonEl.classList.remove("attention");
     micButtonEl.onclick = null;
-
-    interactionActive = (type === "mic" || type === "emoji");
-    stopBoriDowntime();
-
-    // while waiting: both idle
-    if (interactionActive) {
-      setDrColi("idle").catch(() => {});
-      setBori("idle").catch(() => {});
-    }
 
     if (type === "none") return autoAdvance();
     if (type === "emoji") return showEmojiInteraction(interaction);
@@ -538,8 +499,6 @@
   }
 
   function autoAdvance() {
-    interactionActive = false;
-    startBoriDowntime();
     setTimeout(() => playScene(currentSceneIndex + 1), 350);
   }
 
@@ -548,7 +507,7 @@
     const correctIndex = interaction.correctIndex ?? 0;
 
     emojiTrayEl.classList.remove("hidden");
-    requestAnimationFrame(() => emojiTrayEl.classList.add("active"));
+    emojiTrayEl.classList.add("active");
 
     const buttons = emojiTrayEl.querySelectorAll(".emoji-slot");
     buttons.forEach((btn, i) => {
@@ -562,81 +521,57 @@
             playScene(currentSceneIndex + 1);
           }, 200);
         } else {
-          await drColiSay(interaction.onWrongSay?.[0] || "Nice try! Let’s try again.");
+          await speakLine(interaction.onWrongSay?.[0] || "Nice try! Let’s try again.");
         }
       };
     });
   }
 
   function showMicInteraction(interaction) {
-    const targets = Array.isArray(interaction.targets)
-      ? interaction.targets.map(t => String(t).trim()).filter(Boolean)
-      : [(interaction.target || "")].map(t => String(t).trim()).filter(Boolean);
+    const target = (interaction.target || interaction.phrase || interaction.expected || "").trim();
 
     const prompt =
       interaction.prompt ||
-      (targets[0] ? `Tap the mic, then say ${targets[0]}!` : "Tap the mic, then speak!");
+      (target ? `Tap the mic, then say: ${target}` : "Tap the mic, then speak!");
 
     micButtonEl.classList.remove("hidden");
-    micButtonEl.classList.remove("listening");
-    micButtonEl.classList.remove("attention");
 
-    micButtonEl.disabled = true;
+    // Show prompt in bubble (optional)
+    dialogueEl.classList.add("active");
+    dialogueTextEl.textContent = prompt;
 
-    // speak prompt, then glow mic
-    drColiSay(prompt).finally(() => {
-      setDrColi("idle").catch(() => {});
-      setBori("idle").catch(() => {});
-      micButtonEl.disabled = false;
-      micButtonEl.classList.add("attention");
-    });
+    // subtle “pop” when the mic appears / glows
+    playSfx(micPopSfx);
 
     micButtonEl.onclick = async () => {
       await waitForUserInteraction();
-      await prewarmMicPermission();
 
-      micButtonEl.classList.remove("attention");
-      micButtonEl.classList.add("listening");
-      micButtonEl.disabled = true;
+      // visual feedback
+      setDrColi("talk").catch(() => {});
+      setBori("look").catch(() => {});
 
-      const { ok } = await listenAndCheckPhrase(targets, interaction.strictness);
-
-      micButtonEl.classList.remove("listening");
-      micButtonEl.disabled = false;
+      const ok = await listenAndCheckPhrase(target);
 
       if (ok) {
-        await celebrateCorrect(interaction.onSuccessSay?.[0] || "Yes!! Amazing job!");
+        await celebrateCorrect(interaction.onSuccessSay?.[0] || interaction.onCorrectSay?.[0] || "Yes!! Amazing job!");
         micButtonEl.classList.add("hidden");
         playScene(currentSceneIndex + 1);
       } else {
-        await drColiSay(interaction.onFailSay?.[0] || "So close! Let’s try together one more time.");
-        micButtonEl.classList.add("attention");
-        setDrColi("idle").catch(() => {});
-        setBori("idle").catch(() => {});
+        await speakLine(interaction.onFailSay?.[0] || interaction.onWrongSay?.[0] || "Let’s try again!");
+        // keep mic visible so they can retry
       }
     };
   }
 
-  async function listenAndCheckPhrase(targets, strictness) {
-    const hasTargets = Array.isArray(targets) && targets.length > 0;
-
+  async function listenAndCheckPhrase(target) {
     try {
       const blob = await recordOnce({ ms: RECORD_MS });
       const transcript = await sttViaOpenAI(blob);
-      const cleaned = normalizeKo(transcript);
-
-      if (!cleaned) return { ok: false, transcript: transcript || "" };
-      if (!hasTargets) return { ok: true, transcript };
-
-      for (const t of targets) {
-        if (kidForgivingMatchAdvanced(transcript, t, strictness)) {
-          return { ok: true, transcript };
-        }
-      }
-      return { ok: false, transcript };
+      const ok = kidForgivingMatchAdvanced(transcript, target);
+      return ok;
     } catch (e) {
       console.warn("STT mic flow failed:", e);
-      return { ok: false, transcript: "" };
+      return false;
     }
   }
 
@@ -668,7 +603,6 @@
     return (data?.text || "").trim();
   }
 
-  // ===== Kid-forgiving matching =====
   function normalizeKo(s) {
     return (s || "")
       .toLowerCase()
@@ -711,7 +645,7 @@
     return dp[a.length][b.length];
   }
 
-  function kidForgivingMatchAdvanced(spoken, target, strictness) {
+  function kidForgivingMatchAdvanced(spoken, target) {
     const s0 = normalizeKo(spoken);
     const t0 = normalizeKo(target);
     if (!s0 || !t0) return false;
@@ -727,88 +661,86 @@
     const dist = levenshtein(sj, tj);
     const L = Math.max(sj.length, tj.length);
 
-    let maxEdits;
-    if (strictness === "strict") maxEdits = 1;
-    else if (strictness === "easy") maxEdits = L <= 6 ? 2 : L <= 12 ? 3 : 4;
-    else maxEdits = L <= 6 ? 1 : L <= 12 ? 2 : 3;
+    // Forgiving threshold based on length
+    const maxEdits = L <= 6 ? 1 : L <= 12 ? 2 : 3;
 
     return dist <= maxEdits;
   }
 
-  // ===== Celebration (CONFETTI UPGRADED ONLY) =====
+  // ===== Celebration + confetti + SFX stack =====
   async function celebrateCorrect(praiseLine) {
     const prevDr = charState.drColi;
     const prevBori = charState.bori;
 
-    setDrColi("wave", { speed: 0.25 }).catch(() => {});
-    setBori("wave", { speed: 0.25 }).catch(() => {});
+    await setDrColi("wave").catch(() => {});
+    await setBori("wave").catch(() => {});
 
-    spawnImageConfetti(); // upgraded confetti below
-    await drColiSay(praiseLine);
+    // 1) Correct “ding”
+    playSfx(correctSfx);
 
-    setDrColi(prevDr || "idle").catch(() => {});
-    setBori(prevBori || "idle").catch(() => {});
+    // 2) 150ms later: ONE kids cheer (hooray or yay)
+    setTimeout(() => {
+      const pick = Math.random() < 0.5 ? kidsHooraySfx : kidsYaySfx;
+      playSfx(pick);
+    }, 150);
+
+    spawnFullScreenConfetti();
+    await speakLine(praiseLine);
+
+    await setDrColi(prevDr).catch(() => {});
+    await setBori(prevBori).catch(() => {});
   }
 
-  function spawnImageConfetti() {
-    // Two waves = more celebration
-    spawnWave(34, 0);
-    spawnWave(26, 220);
+  function spawnFullScreenConfetti() {
+    const N = 60;
+    const w = fxLayerEl.clientWidth || window.innerWidth;
+    const h = fxLayerEl.clientHeight || window.innerHeight;
 
-    function spawnWave(count, delayMs) {
-      const w = fxLayerEl.clientWidth || window.innerWidth;
-      const h = fxLayerEl.clientHeight || window.innerHeight;
+    for (let i = 0; i < N; i++) {
+      const img = document.createElement("img");
+      img.src = CONFETTI_IMAGES[(Math.random() * CONFETTI_IMAGES.length) | 0];
+      img.alt = "";
+      img.style.position = "absolute";
+      img.style.left = (Math.random() * w) + "px";
+      img.style.top = (-80 - Math.random() * 160) + "px";
+      img.style.width = (16 + Math.random() * 16) + "px";
+      img.style.height = "auto";
+      img.style.opacity = String(0.92 + Math.random() * 0.08);
+      img.style.zIndex = "100";
+      img.style.pointerEvents = "none";
+      fxLayerEl.appendChild(img);
 
-      for (let i = 0; i < count; i++) {
-        const img = document.createElement("img");
-        img.src = CONFETTI_IMAGES[(Math.random() * CONFETTI_IMAGES.length) | 0];
-        img.alt = "";
-        img.style.position = "absolute";
-        img.style.left = (Math.random() * w) + "px";
-        img.style.top = (-80 - Math.random() * 160) + "px";
-        img.style.pointerEvents = "none";
-        img.style.zIndex = "100";
+      const drift = (Math.random() - 0.5) * 360;
+      const sway = (Math.random() - 0.5) * 180;
+      const dur = 1800 + Math.random() * 2800;
 
-        // ~20% of 120px with variety
-        const size = 16 + Math.random() * 16; // 16–32px
-        img.style.width = size + "px";
-        img.style.height = "auto";
-        img.style.opacity = String(0.92 + Math.random() * 0.08);
+      const rot0 = Math.random() * 360;
+      const rot1 = rot0 + (Math.random() * 540 + 180);
+      const rot2 = rot1 + (Math.random() * 540 + 180);
 
-        fxLayerEl.appendChild(img);
+      const startDelay = Math.random() * 220;
 
-        const drift = (Math.random() - 0.5) * 360;
-        const sway = (Math.random() - 0.5) * 180;
-        const dur = 1800 + Math.random() * 2800; // 1.8s–4.6s slower + varied
+      const easing = Math.random() < 0.5
+        ? "cubic-bezier(.18,.70,.20,1)"
+        : "cubic-bezier(.10,.80,.25,1)";
 
-        const rot0 = Math.random() * 360;
-        const rot1 = rot0 + (Math.random() * 540 + 180);
-        const rot2 = rot1 + (Math.random() * 540 + 180);
+      setTimeout(() => {
+        img.animate(
+          [
+            { transform: `translate(0px, 0px) rotate(${rot0}deg)` },
+            { transform: `translate(${drift * 0.35 + sway}px, ${(h + 120) * 0.45}px) rotate(${rot1}deg)` },
+            { transform: `translate(${drift}px, ${h + 160}px) rotate(${rot2}deg)` }
+          ],
+          { duration: dur, easing, fill: "forwards" }
+        );
 
-        const startDelay = delayMs + Math.random() * 220;
-
-        const easing = Math.random() < 0.5
-          ? "cubic-bezier(.18,.70,.20,1)"
-          : "cubic-bezier(.10,.80,.25,1)";
-
-        setTimeout(() => {
-          img.animate(
-            [
-              { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: img.style.opacity },
-              { transform: `translate(${drift * 0.35 + sway}px, ${(h + 120) * 0.45}px) rotate(${rot1}deg)`, opacity: img.style.opacity },
-              { transform: `translate(${drift}px, ${h + 160}px) rotate(${rot2}deg)`, opacity: "0.98" }
-            ],
-            { duration: dur, easing, fill: "forwards" }
-          );
-
-          setTimeout(() => img.remove(), dur + 250);
-        }, startDelay);
-      }
+        setTimeout(() => img.remove(), dur + 250);
+      }, startDelay);
     }
   }
 
-  // ===== UI tweaks =====
   function applyDialogueLayoutFix() {
+    // Move bubble near top so it doesn't cover characters
     dialogueEl.style.left = "50%";
     dialogueEl.style.transform = "translateX(-50%)";
     dialogueEl.style.top = "18px";
@@ -816,14 +748,80 @@
     dialogueEl.style.width = "min(92vw, 900px)";
     dialogueEl.style.height = "auto";
 
+    // Responsive text sizing
     dialogueTextEl.style.fontSize = "clamp(18px, 3.2vw, 38px)";
     dialogueTextEl.style.top = "22px";
     dialogueTextEl.style.left = "52px";
     dialogueTextEl.style.right = "52px";
   }
 
-  // ===== Utils =====
-  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function initSfx() {
+    // These will only actually play after a user interaction (browser policy)
+    introMusic = new Audio(SFX_INTRO);
+    introMusic.loop = true;
+    introMusic.volume = NORMAL_MUSIC_VOL;
 
+    correctSfx = new Audio(SFX_CORRECT);
+    correctSfx.volume = 0.85;
+
+    kidsHooraySfx = new Audio(SFX_KIDS_HOORAY);
+    kidsHooraySfx.volume = 0.55;
+
+    kidsYaySfx = new Audio(SFX_KIDS_YAY);
+    kidsYaySfx.volume = 0.55;
+
+    // “Pop” on mic glow (we're reusing giggle softly)
+    micPopSfx = new Audio(SFX_MIC_POP);
+    micPopSfx.volume = 0.18;
+  }
+
+  function playSfx(aud) {
+    if (!aud) return;
+    try {
+      aud.currentTime = 0;
+      aud.play().catch(() => {});
+    } catch {}
+  }
+
+  function fadeOutAudio(aud, ms = 900) {
+    return new Promise(resolve => {
+      if (!aud) return resolve();
+      const startVol = aud.volume ?? 0;
+      const steps = 15;
+      let i = 0;
+      const iv = setInterval(() => {
+        i++;
+        const t = i / steps;
+        aud.volume = Math.max(0, startVol * (1 - t));
+        if (i >= steps) {
+          clearInterval(iv);
+          try { aud.pause(); aud.currentTime = 0; } catch {}
+          aud.volume = startVol; // reset for next time
+          resolve();
+        }
+      }, Math.max(16, Math.floor(ms / steps)));
+    });
+  }
+
+  function duckMusicForSpeech(isDucked) {
+    if (!introMusic) return;
+    const target = isDucked ? DUCKED_MUSIC_VOL : NORMAL_MUSIC_VOL;
+    const steps = 8;
+    const start = introMusic.volume ?? NORMAL_MUSIC_VOL;
+    let i = 0;
+    const iv = setInterval(() => {
+      i++;
+      const t = i / steps;
+      introMusic.volume = start + (target - start) * t;
+      if (i >= steps) clearInterval(iv);
+    }, 35);
+  }
+
+  function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
 })();
