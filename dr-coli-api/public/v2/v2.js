@@ -109,28 +109,43 @@
     }
   }
 
-  async function loadSpritesheetTexturesSafe(jsonUrl, label) {
-    try {
-      const loaded = await PIXI.Assets.load(jsonUrl);
+ async function loadSpritesheetTexturesSafe(jsonUrl, label) {
+  try {
+    // --- Prevent duplicate texture cache warnings ---
+    const originalAdd = PIXI.Texture.addToCache;
+    const originalRemove = PIXI.Texture.removeFromCache;
 
-      const sheet =
-        loaded?.textures ? loaded :
-        loaded?.spritesheet?.textures ? loaded.spritesheet :
-        null;
+    // Temporarily disable global texture cache writes
+    PIXI.Texture.addToCache = () => {};
+    PIXI.Texture.removeFromCache = () => {};
 
-      if (!sheet || !sheet.textures) {
-        console.warn(`[sheet] No textures found for ${label}: ${jsonUrl}`);
-        return [];
-      }
+    const loaded = await PIXI.Assets.load(jsonUrl);
 
-      const keys = Object.keys(sheet.textures).sort();
-      return keys.map(k => sheet.textures[k]);
-    } catch (err) {
-      // This is where your current 404 ends up.
-      console.error(`[sheet] Failed to load ${label}: ${jsonUrl}`, err);
+    // Restore cache functions immediately after load
+    PIXI.Texture.addToCache = originalAdd;
+    PIXI.Texture.removeFromCache = originalRemove;
+
+    const sheet =
+      loaded?.textures
+        ? loaded
+        : loaded?.spritesheet?.textures
+        ? loaded.spritesheet
+        : null;
+
+    if (!sheet || !sheet.textures) {
+      console.warn(`[sheet] No textures found for ${label}: ${jsonUrl}`);
       return [];
     }
+
+    // Stable order
+    const keys = Object.keys(sheet.textures).sort();
+    return keys.map(k => sheet.textures[k]);
+
+  } catch (err) {
+    console.error(`[sheet] Failed to load ${label}: ${jsonUrl}`, err);
+    return [];
   }
+}
 
   // ===== Create & place characters =====
   function createCharacters() {
