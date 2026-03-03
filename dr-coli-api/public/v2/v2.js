@@ -25,6 +25,8 @@
   const STT_MODEL = "gpt-4o-mini-transcribe";
   const STT_LANGUAGE = "ko";
   const RECORD_MS = 2600;
+  const SPEECH_RMS_THRESHOLD = 0.04;
+  const MIN_SPEECH_MS = 140;
 
   // ===== Confetti images =====
   const CONFETTI_IMAGES = [
@@ -158,9 +160,6 @@
   }
 
   function normalizeManifest(man) {
-    // If someone wraps inside { drColi: ..., bori: ... } we're good.
-    // If it’s { "drColi":..., "bori":... } we're good.
-    // If it's { "DrColi":... } etc, we fallback with best effort.
     const out = { drColi: null, bori: null };
 
     out.drColi =
@@ -549,6 +548,7 @@
     micButtonEl.classList.add("hidden");
     micButtonEl.classList.remove("listening");
     micButtonEl.classList.remove("attention");
+    micButtonEl.classList.remove("processing");
     micButtonEl.onclick = null;
 
     if (type === "none") return autoAdvance();
@@ -599,7 +599,6 @@
 
   // ===== Mic interaction (targets[] + strictness + pulse/glow + no empty auto-success) =====
   function showMicInteraction(interaction) {
-    // Support both: interaction.targets (array) and interaction.target (string)
     const targets = Array.isArray(interaction?.targets)
       ? interaction.targets.map((t) => String(t || "").trim()).filter(Boolean)
       : [
@@ -617,9 +616,10 @@
         ? `Tap the mic, then say ${targets[0]}!`
         : "Tap the mic, then speak!");
 
-    // Show mic + glow (if CSS defines .attention)
+    // Show mic + glow
     micButtonEl.classList.remove("hidden");
     micButtonEl.classList.remove("listening");
+    micButtonEl.classList.remove("processing");
     micButtonEl.classList.add("attention");
     micButtonEl.disabled = true;
 
@@ -630,7 +630,7 @@
     // Subtle UI “pop” when mic becomes actionable
     playSfx(micPopSfx);
 
-    // Speak prompt (with ducking) and show Dr. Coli talking animation
+    // Speak prompt and show Dr. Coli talking animation
     (async () => {
       try {
         await setDrColi("talk").catch(() => {});
@@ -645,51 +645,67 @@
 
     micButtonEl.onclick = async () => {
       const myRun = sceneRunId;
-      if (micBusy) return; // ignore double taps
+      if (micBusy) return;
       micBusy = true;
 
       try {
         await waitForUserInteraction();
 
         // Start listening UI (CSS pulse uses .mic.listening img)
-       micButtonEl.classList.remove("attention");
-micButtonEl.classList.add("listening");
-micButtonEl.disabled = true;
+        micButtonEl.classList.remove("attention");
+        micButtonEl.classList.add("listening");
+        micButtonEl.classList.remove("processing");
+        micButtonEl.disabled = true;
 
-setDrColi("idle").catch(() => {});
-setBori("idle").catch(() => {});
+        setDrColi("idle").catch(() => {});
+        setBori("idle").catch(() => {});
 
-// 🔴 RECORD FIRST
-const recordPromise = listenAndCheckPhrase(targets, strictness);
+        // 🔴 Record + detect speech (no STT cost if silent)
+        const { blob, speechStarted } = await recordOnceWithSpeechDetect({ ms: RECORD_MS });
 
-// 🟡 Immediately switch to processing state
-micButtonEl.classList.remove("listening");
-micButtonEl.classList.add("processing");
-
-// Show thinking message
-dialogueEl.classList.add("active");
-dialogueTextEl.textContent = "Let me listen…";
-
-// Dr. Coli says it
-await setDrColi("talk").catch(() => {});
-await speakLine("Let me listen…");
-await setDrColi("idle").catch(() => {});
-
-// Ensure processing UI stays visible at least 600ms
-const minProcessingTime = sleep(600);
-
-const [result] = await Promise.all([
-  recordPromise,
-  minProcessingTime
-]);
-
-// Remove processing glow
-micButtonEl.classList.remove("processing");
-
-        // If scene changed while recording/transcribing, ignore the result
+        // If scene changed while recording, ignore
         if (myRun !== sceneRunId) return;
 
+        // Stop pulse now that recording is done
         micButtonEl.classList.remove("listening");
+
+        if (!speechStarted) {
+          // Gentle retry on silence (no STT call)
+          const silentLine = "Hmm… I didn’t hear anything. Let’s try again!";
+          dialogueEl.classList.add("active");
+          dialogueTextEl.textContent = silentLine;
+          await setDrColi("talk").catch(() => {});
+          await speakLine(silentLine);
+          await setDrColi("idle").catch(() => {});
+          if (myRun !== sceneRunId) return;
+
+          micButtonEl.disabled = false;
+          micButtonEl.classList.add("attention");
+          return;
+        }
+
+        // 🟡 Processing state (slow glow) AFTER the kid spoke
+        micButtonEl.classList.add("processing");
+
+        dialogueEl.classList.add("active");
+        dialogueTextEl.textContent = "One moment!";
+
+        await setDrColi("talk").catch(() => {});
+        await speakLine("One moment!");
+        await setDrColi("idle").catch(() => {});
+
+        // Ensure processing UI stays visible at least 600ms
+        const minProcessingTime = sleep(600);
+
+        const checkPromise = listenAndCheckPhrase(targets, strictness, blob);
+        const [result] = await Promise.all([checkPromise, minProcessingTime]);
+
+        // Remove processing glow
+        micButtonEl.classList.remove("processing");
+
+        // If scene changed while recording/transcribing, ignore
+        if (myRun !== sceneRunId) return;
+
         micButtonEl.disabled = false;
 
         if (result.ok) {
@@ -700,7 +716,6 @@ micButtonEl.classList.remove("processing");
           micButtonEl.classList.add("hidden");
           playScene(currentSceneIndex + 1);
         } else {
-          // Encourage retry (spoken by Dr. Coli)
           const failLine =
             interaction?.onFailSay?.[0] ||
             "So close! Let’s try together one more time.";
@@ -711,7 +726,6 @@ micButtonEl.classList.remove("processing");
           await setDrColi("idle").catch(() => {});
           if (myRun !== sceneRunId) return;
 
-          // Bring back glow so user knows to tap again
           micButtonEl.classList.add("attention");
         }
       } finally {
@@ -720,13 +734,13 @@ micButtonEl.classList.remove("processing");
     };
   }
 
-  async function listenAndCheckPhrase(targets, strictness) {
+  async function listenAndCheckPhrase(targets, strictness, blobOverride = null) {
     try {
       const list = Array.isArray(targets)
         ? targets.map((t) => String(t || "").trim()).filter(Boolean)
         : [String(targets || "").trim()].filter(Boolean);
 
-      const blob = await recordOnce({ ms: RECORD_MS });
+      const blob = blobOverride || (await recordOnce({ ms: RECORD_MS }));
       const transcript = await sttViaOpenAI(blob);
 
       // IMPORTANT: never auto-succeed on empty transcript
@@ -767,6 +781,68 @@ micButtonEl.classList.remove("processing");
     });
   }
 
+  // Record audio AND detect whether the kid actually spoke (simple RMS VAD)
+  async function recordOnceWithSpeechDetect({ ms = RECORD_MS, minSpeakMs = MIN_SPEECH_MS, rmsThreshold = SPEECH_RMS_THRESHOLD } = {}) {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const rec = new MediaRecorder(stream);
+    const chunks = [];
+
+    // WebAudio analyser for RMS (voice activity)
+    const AC = window.AudioContext || window.webkitAudioContext;
+    let ctx = null;
+    let interval = null;
+    let speechStarted = false;
+    let speakAccum = 0;
+    let lastT = performance.now();
+
+    try {
+      ctx = AC ? new AC() : null;
+      if (ctx) {
+        const src = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        src.connect(analyser);
+
+        const data = new Uint8Array(analyser.fftSize);
+
+        interval = setInterval(() => {
+          const now = performance.now();
+          const dt = now - lastT;
+          lastT = now;
+
+          analyser.getByteTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) {
+            const v = (data[i] - 128) / 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / data.length);
+
+          if (rms > rmsThreshold) speakAccum += dt;
+          else speakAccum = Math.max(0, speakAccum - dt * 0.5);
+
+          if (!speechStarted && speakAccum >= minSpeakMs) speechStarted = true;
+        }, 50);
+      }
+
+      const blob = await new Promise((resolve, reject) => {
+        rec.ondataavailable = (e) => {
+          if (e.data && e.data.size) chunks.push(e.data);
+        };
+        rec.onerror = (e) => reject(e.error || e);
+        rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
+        rec.start();
+        setTimeout(() => rec.stop(), ms);
+      });
+
+      return { blob, speechStarted };
+    } finally {
+      if (interval) clearInterval(interval);
+      try { if (ctx) await ctx.close(); } catch {}
+      try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+    }
+  }
+
   async function sttViaOpenAI(blob) {
     const fd = new FormData();
     fd.append("file", blob, "speech.webm");
@@ -785,80 +861,9 @@ micButtonEl.classList.remove("processing");
   }
 
   function toJamo(str) {
-    const CHO = [
-      "ㄱ",
-      "ㄲ",
-      "ㄴ",
-      "ㄷ",
-      "ㄸ",
-      "ㄹ",
-      "ㅁ",
-      "ㅂ",
-      "ㅃ",
-      "ㅅ",
-      "ㅆ",
-      "ㅇ",
-      "ㅈ",
-      "ㅉ",
-      "ㅊ",
-      "ㅋ",
-      "ㅌ",
-      "ㅍ",
-      "ㅎ",
-    ];
-    const JUNG = [
-      "ㅏ",
-      "ㅐ",
-      "ㅑ",
-      "ㅒ",
-      "ㅓ",
-      "ㅔ",
-      "ㅕ",
-      "ㅖ",
-      "ㅗ",
-      "ㅘ",
-      "ㅙ",
-      "ㅚ",
-      "ㅛ",
-      "ㅜ",
-      "ㅝ",
-      "ㅞ",
-      "ㅟ",
-      "ㅠ",
-      "ㅡ",
-      "ㅢ",
-      "ㅣ",
-    ];
-    const JONG = [
-      "",
-      "ㄱ",
-      "ㄲ",
-      "ㄳ",
-      "ㄴ",
-      "ㄵ",
-      "ㄶ",
-      "ㄷ",
-      "ㄹ",
-      "ㄺ",
-      "ㄻ",
-      "ㄼ",
-      "ㄽ",
-      "ㄾ",
-      "ㄿ",
-      "ㅀ",
-      "ㅁ",
-      "ㅂ",
-      "ㅄ",
-      "ㅅ",
-      "ㅆ",
-      "ㅇ",
-      "ㅈ",
-      "ㅊ",
-      "ㅋ",
-      "ㅌ",
-      "ㅍ",
-      "ㅎ",
-    ];
+    const CHO = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+    const JUNG = ["ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ","ㅗ","ㅘ","ㅙ","ㅚ","ㅛ","ㅜ","ㅝ","ㅞ","ㅟ","ㅠ","ㅡ","ㅢ","ㅣ"];
+    const JONG = ["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
 
     let out = "";
     for (const ch of str) {
@@ -902,11 +907,9 @@ micButtonEl.classList.remove("processing");
     if (!s0 || !t0) return false;
     if (s0 === t0) return true;
 
-    // Lightly ignore common kid endings
     const s = s0.replace(/(요|이요|으)$/g, "");
     const t = t0.replace(/(요|이요|으)$/g, "");
 
-    // Fast contains checks (very forgiving)
     if (s.includes(t) || t.includes(s)) return true;
 
     const sj = toJamo(s);
@@ -914,10 +917,6 @@ micButtonEl.classList.remove("processing");
     const dist = levenshtein(sj, tj);
     const L = Math.max(sj.length, tj.length);
 
-    // Strictness knobs
-    // - strict: nearly exact
-    // - normal: default
-    // - easy: forgiving for kids (e.g., 안녕하세이요)
     let maxEdits;
     if (strictness === "strict") maxEdits = L <= 10 ? 1 : 2;
     else if (strictness === "normal")
@@ -935,10 +934,8 @@ micButtonEl.classList.remove("processing");
     await setDrColi("wave").catch(() => {});
     await setBori("wave").catch(() => {});
 
-    // 1) Correct “ding”
     playSfx(correctSfx);
 
-    // 2) 150ms later: ONE kids cheer (hooray or yay)
     setTimeout(() => {
       const pick = Math.random() < 0.5 ? kidsHooraySfx : kidsYaySfx;
       playSfx(pick);
@@ -946,7 +943,6 @@ micButtonEl.classList.remove("processing");
 
     spawnFullScreenConfetti();
 
-    // Show praise text in bubble too
     dialogueEl.classList.add("active");
     dialogueTextEl.textContent = String(praiseLine || "");
 
@@ -1012,7 +1008,6 @@ micButtonEl.classList.remove("processing");
   }
 
   function applyDialogueLayoutFix() {
-    // Move bubble near top so it doesn't cover characters
     dialogueEl.style.left = "50%";
     dialogueEl.style.transform = "translateX(-50%)";
     dialogueEl.style.top = "18px";
@@ -1020,7 +1015,6 @@ micButtonEl.classList.remove("processing");
     dialogueEl.style.width = "min(92vw, 900px)";
     dialogueEl.style.height = "auto";
 
-    // Responsive text sizing
     dialogueTextEl.style.fontSize = "clamp(18px, 3.2vw, 38px)";
     dialogueTextEl.style.top = "22px";
     dialogueTextEl.style.left = "52px";
@@ -1028,7 +1022,6 @@ micButtonEl.classList.remove("processing");
   }
 
   function initSfx() {
-    // These will only actually play after a user interaction (browser policy)
     introMusic = new Audio(SFX_INTRO);
     introMusic.loop = true;
     introMusic.volume = NORMAL_MUSIC_VOL;
@@ -1042,7 +1035,6 @@ micButtonEl.classList.remove("processing");
     kidsYaySfx = new Audio(SFX_KIDS_YAY);
     kidsYaySfx.volume = 0.55;
 
-    // “Pop” on mic glow (we're reusing giggle softly)
     micPopSfx = new Audio(SFX_MIC_POP);
     micPopSfx.volume = 0.18;
   }
@@ -1071,7 +1063,7 @@ micButtonEl.classList.remove("processing");
             aud.pause();
             aud.currentTime = 0;
           } catch {}
-          aud.volume = startVol; // reset for next time
+          aud.volume = startVol;
           resolve();
         }
       }, Math.max(16, Math.floor(ms / steps)));
