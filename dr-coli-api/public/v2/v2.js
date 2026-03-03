@@ -652,15 +652,39 @@
         await waitForUserInteraction();
 
         // Start listening UI (CSS pulse uses .mic.listening img)
-        micButtonEl.classList.remove("attention");
-        micButtonEl.classList.add("listening");
-        micButtonEl.disabled = true;
+       micButtonEl.classList.remove("attention");
+micButtonEl.classList.add("listening");
+micButtonEl.disabled = true;
 
-        // While listening, keep both characters idle
-        setDrColi("idle").catch(() => {});
-        setBori("idle").catch(() => {});
+setDrColi("idle").catch(() => {});
+setBori("idle").catch(() => {});
 
-        const result = await listenAndCheckPhrase(targets, strictness);
+// 🔴 RECORD FIRST
+const recordPromise = listenAndCheckPhrase(targets, strictness);
+
+// 🟡 Immediately switch to processing state
+micButtonEl.classList.remove("listening");
+micButtonEl.classList.add("processing");
+
+// Show thinking message
+dialogueEl.classList.add("active");
+dialogueTextEl.textContent = "Let me listen…";
+
+// Dr. Coli says it
+await setDrColi("talk").catch(() => {});
+await speakLine("Let me listen…");
+await setDrColi("idle").catch(() => {});
+
+// Ensure processing UI stays visible at least 600ms
+const minProcessingTime = sleep(600);
+
+const [result] = await Promise.all([
+  recordPromise,
+  minProcessingTime
+]);
+
+// Remove processing glow
+micButtonEl.classList.remove("processing");
 
         // If scene changed while recording/transcribing, ignore the result
         if (myRun !== sceneRunId) return;
