@@ -8,9 +8,9 @@
    "drColi": {
      "animation": "talk",
      "say": [
-       "Hello, dear friends! My name is Dr. 컬리.",
+       "Hello, dear friends! My name is Dr. Coli.",
        "I’ll be teaching you Korean.",
-       "You can also call me 컬리 선생님."
+       "You can also call me Coli 선생님."
      ]
    },
    "bori": { "animation": "look" },
