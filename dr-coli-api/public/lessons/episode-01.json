@@ -55,19 +55,29 @@
       "interaction": { "type": "none" }
     },
 
-    {
-      "id": "s3-intro-annyonghaseyo",
-      "drColi": {
-        "animation": "talk",
-        "say": [
-          "Since it’s so nice to meet each other, let’s say hello in Korean.",
-          "In Korean, when we meet adults, we say: 안녕하세요.",
-          "When we say 안녕하세요, we do a little bow. Like this!"
-        ]
-      },
-      "bori": { "animation": "bow" },
-      "interaction": { "type": "none" }
-    },
+{
+  "id": "s3a-intro-annyonghaseyo",
+  "drColi": {
+    "animation": "talk",
+    "say": [
+      "Since it’s so nice to meet each other, let’s say hello in Korean.",
+      "In Korean, when we meet adults, we say: 안녕하세요."
+    ]
+  },
+  "bori": { "animation": "idle" },
+  "interaction": { "type": "none" }
+},
+{
+  "id": "s3b-bow-like-this",
+  "drColi": {
+    "animation": "talk",
+    "say": [
+      "When we say 안녕하세요, we do a little bow. Like this!"
+    ]
+  },
+  "bori": { "animation": "bow" },
+  "interaction": { "type": "none" }
+},
 
     {
       "id": "s4-repeat-annyonghaseyo",
