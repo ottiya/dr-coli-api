@@ -126,4 +126,22 @@
       "interaction": { "type": "none" }
     }
   ]
-}
+},
+{
+      "id": "s7-emoji-check-annyon",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Quick check!",
+          "How do we say 안녕?"
+        ]
+      },
+      "bori": { "animation": "look" },
+      "interaction": {
+        "type": "emoji",
+        "choices": ["🙇‍♀️", "👋", "🏃‍♀️"],
+        "correctIndex": 1,
+        "onCorrectSay": ["Yes! We wave when we say 안녕!"],
+        "onWrongSay": ["Nice try! Let’s try again. How do we say 안녕?"]
+      }
+    }
