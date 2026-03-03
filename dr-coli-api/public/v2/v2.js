@@ -11,8 +11,8 @@
   const CHARACTER_MANIFEST_URL = "/assets/characters.manifest.json";
 
   // TTS
-  const TTS_RATE = 1.25;           // faster speaking
-  const BETWEEN_LINES_MS = 80;     // less delay between lines
+  const TTS_RATE = 1.25; // faster speaking
+  const BETWEEN_LINES_MS = 80; // less delay between lines
 
   // ===== Sound Effects (public/assets/sound-effects) =====
   const SFX_INTRO = "/assets/sound-effects/ottiya-korean-intro-song.wav";
@@ -37,6 +37,9 @@
 
   // ===== State =====
   let currentSceneIndex = 0;
+  let micBusy = false;
+  let sceneRunId = 0;
+  let pendingAdvanceTimer = null;
   let episodeData = null;
   let characterManifest = null;
 
@@ -49,7 +52,13 @@
   const charState = { drColi: "idle", bori: "idle" };
 
   // DOM
-  let bgLayer, dialogueEl, dialogueTextEl, emojiTrayEl, micButtonEl, fxLayerEl, stageLayerEl;
+  let bgLayer,
+    dialogueEl,
+    dialogueTextEl,
+    emojiTrayEl,
+    micButtonEl,
+    fxLayerEl,
+    stageLayerEl;
 
   // Audio unlock gate
   let userInteracted = false;
@@ -79,8 +88,18 @@
     fxLayerEl = document.getElementById("fxLayer");
     stageLayerEl = document.getElementById("stageLayer");
 
-    if (!bgLayer || !dialogueEl || !dialogueTextEl || !emojiTrayEl || !micButtonEl || !fxLayerEl || !stageLayerEl) {
-      console.error("Missing required DOM elements. Check index.html for: bgLayer, stageLayer, UI elements.");
+    if (
+      !bgLayer ||
+      !dialogueEl ||
+      !dialogueTextEl ||
+      !emojiTrayEl ||
+      !micButtonEl ||
+      !fxLayerEl ||
+      !stageLayerEl
+    ) {
+      console.error(
+        "Missing required DOM elements. Check index.html for: bgLayer, stageLayer, UI elements."
+      );
       return;
     }
 
@@ -88,7 +107,7 @@
     initSfx();
     ensureStartOverlay();
 
-    boot().catch(err => console.error("BOOT ERROR:", err));
+    boot().catch((err) => console.error("BOOT ERROR:", err));
   });
 
   async function boot() {
@@ -102,7 +121,8 @@
 
     // Load episode + manifest in parallel
     const [ep, man] = await Promise.all([
-      fetchJSON(EPISODE_URL), fetchJSON(CHARACTER_MANIFEST_URL),
+      fetchJSON(EPISODE_URL),
+      fetchJSON(CHARACTER_MANIFEST_URL),
     ]);
 
     episodeData = ep;
@@ -143,10 +163,16 @@
     // If it's { "DrColi":... } etc, we fallback with best effort.
     const out = { drColi: null, bori: null };
 
-    out.drColi = man?.drColi || man?.DrColi || man?.drcoli || man?.["dr-coli"] || man?.["dr_coli"] || null;
+    out.drColi =
+      man?.drColi ||
+      man?.DrColi ||
+      man?.drcoli ||
+      man?.["dr-coli"] ||
+      man?.["dr_coli"] ||
+      null;
     out.bori = man?.bori || man?.Bori || null;
 
-    return (out.drColi || out.bori) ? out : man;
+    return out.drColi || out.bori ? out : man;
   }
 
   function initPixi() {
@@ -163,8 +189,12 @@
     const drIdle = textureCache.drColi.idle || [];
     const boriIdle = textureCache.bori.idle || [];
 
-    drColiSprite = new PIXI.AnimatedSprite(drIdle.length ? drIdle : [PIXI.Texture.WHITE]);
-    boriSprite = new PIXI.AnimatedSprite(boriIdle.length ? boriIdle : [PIXI.Texture.WHITE]);
+    drColiSprite = new PIXI.AnimatedSprite(
+      drIdle.length ? drIdle : [PIXI.Texture.WHITE]
+    );
+    boriSprite = new PIXI.AnimatedSprite(
+      boriIdle.length ? boriIdle : [PIXI.Texture.WHITE]
+    );
 
     drColiSprite.anchor.set(0.5, 1);
     boriSprite.anchor.set(0.5, 1);
@@ -184,7 +214,7 @@
     const w = pixiApp.renderer.width;
     const h = pixiApp.renderer.height;
 
-    const scale = clamp(Math.min(w / 1200, h / 675), 0.30, 0.62);
+    const scale = clamp(Math.min(w / 1200, h / 675), 0.3, 0.62);
     drColiSprite.scale.set(scale);
     boriSprite.scale.set(scale);
 
@@ -201,7 +231,11 @@
     boriSprite.y = groundY + 10;
   }
 
-  function playCharacterState(sprite, textures, { speed = 0.22, pingpong = true } = {}) {
+  function playCharacterState(
+    sprite,
+    textures,
+    { speed = 0.22, pingpong = true } = {}
+  ) {
     if (!sprite) return;
     if (!textures || textures.length === 0) {
       sprite.stop();
@@ -223,7 +257,8 @@
 
     sprite.onFrameChange = (frame) => {
       if (!sprite._pingpong) return;
-      if (frame === sprite.textures.length - 1) sprite.animationSpeed = -sprite._ppAbs;
+      if (frame === sprite.textures.length - 1)
+        sprite.animationSpeed = -sprite._ppAbs;
       else if (frame === 0) sprite.animationSpeed = sprite._ppAbs;
     };
 
@@ -233,13 +268,21 @@
   async function setDrColi(state, opts = {}) {
     charState.drColi = state;
     await ensureStateLoaded("drColi", state);
-    playCharacterState(drColiSprite, textureCache.drColi[state], { speed: 0.22, pingpong: true, ...opts });
+    playCharacterState(drColiSprite, textureCache.drColi[state], {
+      speed: 0.22,
+      pingpong: true,
+      ...opts,
+    });
   }
 
   async function setBori(state, opts = {}) {
     charState.bori = state;
     await ensureStateLoaded("bori", state);
-    playCharacterState(boriSprite, textureCache.bori[state], { speed: 0.22, pingpong: true, ...opts });
+    playCharacterState(boriSprite, textureCache.bori[state], {
+      speed: 0.22,
+      pingpong: true,
+      ...opts,
+    });
   }
 
   async function ensureStateLoaded(characterKey, stateName) {
@@ -255,7 +298,10 @@
     const textures = [];
 
     for (const jsonUrl of jsonUrls) {
-      const sheetTextures = await loadSpritesheetTexturesSafe(jsonUrl, `${characterKey}.${stateName}`);
+      const sheetTextures = await loadSpritesheetTexturesSafe(
+        jsonUrl,
+        `${characterKey}.${stateName}`
+      );
       textures.push(...sheetTextures);
     }
 
@@ -270,7 +316,7 @@
     while (ax.length && bx.length) {
       const an = ax.shift();
       const bn = bx.shift();
-      const nn = (an[0] - bn[0]) || an[1].localeCompare(bn[1]);
+      const nn = an[0] - bn[0] || an[1].localeCompare(bn[1]);
       if (nn) return nn;
     }
     return ax.length - bx.length;
@@ -279,10 +325,11 @@
   async function loadSpritesheetTexturesSafe(jsonUrl, label) {
     try {
       const loaded = await PIXI.Assets.load(jsonUrl);
-      const sheet =
-        loaded?.textures ? loaded :
-        loaded?.spritesheet?.textures ? loaded.spritesheet :
-        null;
+      const sheet = loaded?.textures
+        ? loaded
+        : loaded?.spritesheet?.textures
+        ? loaded.spritesheet
+        : null;
 
       if (!sheet || !sheet.textures) {
         console.warn(`[sheet] No textures for ${label}: ${jsonUrl}`);
@@ -290,7 +337,7 @@
       }
 
       const keys = Object.keys(sheet.textures).sort(naturalCompare);
-      return keys.map(k => sheet.textures[k]);
+      return keys.map((k) => sheet.textures[k]);
     } catch (err) {
       console.error(`[sheet] Failed ${label}: ${jsonUrl}`, err);
       return [];
@@ -312,6 +359,11 @@
   }
 
   function playScene(index) {
+    sceneRunId++;
+    if (pendingAdvanceTimer) {
+      clearTimeout(pendingAdvanceTimer);
+      pendingAdvanceTimer = null;
+    }
     currentSceneIndex = index;
     const scene = episodeData?.scenes?.[index];
     if (!scene) return;
@@ -322,7 +374,9 @@
     setBori(scene.bori?.animation || "idle").catch(() => {});
 
     const lines = scene.drColi?.say || [];
-    playDialogue(lines, () => enableInteraction(scene.interaction || { type: "none" }));
+    playDialogue(lines, () =>
+      enableInteraction(scene.interaction || { type: "none" })
+    );
   }
 
   async function playDialogue(lines, done) {
@@ -379,28 +433,32 @@
       </div>
     `;
 
-    overlay.addEventListener("pointerdown", async () => {
-      userInteracted = true;
-      overlay.remove();
-      await unlockAudioContext();
+    overlay.addEventListener(
+      "pointerdown",
+      async () => {
+        userInteracted = true;
+        overlay.remove();
+        await unlockAudioContext();
 
-      // Intro music: start → hold ~2s → fade out → start lesson
-      try {
-        if (introMusic) {
-          introMusic.currentTime = 0;
-          introMusic.volume = NORMAL_MUSIC_VOL;
-          await introMusic.play();
+        // Intro music: start → hold ~2s → fade out → start lesson
+        try {
+          if (introMusic) {
+            introMusic.currentTime = 0;
+            introMusic.volume = NORMAL_MUSIC_VOL;
+            await introMusic.play();
+          }
+        } catch {
+          // non-fatal
         }
-      } catch {
-        // non-fatal
-      }
 
-      await sleep(2000);
-      await fadeOutAudio(introMusic, 900);
+        await sleep(2000);
+        await fadeOutAudio(introMusic, 900);
 
-      introSequenceDone = true;
-      maybeStartEpisode();
-    }, { once: true });
+        introSequenceDone = true;
+        maybeStartEpisode();
+      },
+      { once: true }
+    );
 
     document.body.appendChild(overlay);
   }
@@ -427,7 +485,7 @@
     if (userInteracted) return;
     if (!unlockPromise) {
       ensureStartOverlay();
-      unlockPromise = new Promise(resolve => {
+      unlockPromise = new Promise((resolve) => {
         const handler = () => {
           userInteracted = true;
           window.removeEventListener("pointerdown", handler);
@@ -470,7 +528,7 @@
       audio.playbackRate = TTS_RATE;
 
       await audio.play();
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         audio.onended = () => resolve();
         audio.onerror = () => resolve();
       });
@@ -501,7 +559,13 @@
   }
 
   function autoAdvance() {
-    setTimeout(() => playScene(currentSceneIndex + 1), 350);
+    const myRun = sceneRunId;
+    if (pendingAdvanceTimer) clearTimeout(pendingAdvanceTimer);
+
+    pendingAdvanceTimer = setTimeout(() => {
+      if (myRun !== sceneRunId) return;
+      playScene(currentSceneIndex + 1);
+    }, 350);
   }
 
   function showEmojiInteraction(interaction) {
@@ -516,31 +580,42 @@
       btn.textContent = choices[i] || "";
       btn.onclick = async () => {
         if (i === correctIndex) {
-          await celebrateCorrect(interaction.onCorrectSay?.[0] || "Yes!! Amazing job!");
+          await celebrateCorrect(
+            interaction.onCorrectSay?.[0] || "Yes!! Amazing job!"
+          );
           emojiTrayEl.classList.remove("active");
           setTimeout(() => {
             emojiTrayEl.classList.add("hidden");
             playScene(currentSceneIndex + 1);
           }, 200);
         } else {
-          await speakLine(interaction.onWrongSay?.[0] || "Nice try! Let’s try again.");
+          await speakLine(
+            interaction.onWrongSay?.[0] || "Nice try! Let’s try again."
+          );
         }
       };
     });
   }
 
-  // ===== Mic interaction (RESTORED: targets[] + strictness + pulse/glow + no empty auto-success) =====
+  // ===== Mic interaction (targets[] + strictness + pulse/glow + no empty auto-success) =====
   function showMicInteraction(interaction) {
     // Support both: interaction.targets (array) and interaction.target (string)
     const targets = Array.isArray(interaction?.targets)
-      ? interaction.targets.map(t => String(t || "").trim()).filter(Boolean)
-      : [String(interaction?.target || interaction?.phrase || interaction?.expected || "").trim()].filter(Boolean);
+      ? interaction.targets.map((t) => String(t || "").trim()).filter(Boolean)
+      : [
+          String(
+            interaction?.target || interaction?.phrase || interaction?.expected || ""
+          )
+            .trim(),
+        ].filter(Boolean);
 
     const strictness = interaction?.strictness || "easy";
 
     const prompt =
       interaction?.prompt ||
-      (targets[0] ? `Tap the mic, then say ${targets[0]}!` : "Tap the mic, then speak!");
+      (targets[0]
+        ? `Tap the mic, then say ${targets[0]}!`
+        : "Tap the mic, then speak!");
 
     // Show mic + glow (if CSS defines .attention)
     micButtonEl.classList.remove("hidden");
@@ -569,37 +644,54 @@
     })();
 
     micButtonEl.onclick = async () => {
-      await waitForUserInteraction();
+      const myRun = sceneRunId;
+      if (micBusy) return; // ignore double taps
+      micBusy = true;
 
-      // Start listening UI (CSS pulse uses .mic.listening img)
-      micButtonEl.classList.remove("attention");
-      micButtonEl.classList.add("listening");
-      micButtonEl.disabled = true;
+      try {
+        await waitForUserInteraction();
 
-      // While listening, keep both characters idle
-      setDrColi("idle").catch(() => {});
-      setBori("idle").catch(() => {});
+        // Start listening UI (CSS pulse uses .mic.listening img)
+        micButtonEl.classList.remove("attention");
+        micButtonEl.classList.add("listening");
+        micButtonEl.disabled = true;
 
-      const result = await listenAndCheckPhrase(targets, strictness);
+        // While listening, keep both characters idle
+        setDrColi("idle").catch(() => {});
+        setBori("idle").catch(() => {});
 
-      micButtonEl.classList.remove("listening");
-      micButtonEl.disabled = false;
+        const result = await listenAndCheckPhrase(targets, strictness);
 
-      if (result.ok) {
-        await celebrateCorrect(interaction?.onSuccessSay?.[0] || "Yes!! Amazing job!");
-        micButtonEl.classList.add("hidden");
-        playScene(currentSceneIndex + 1);
-      } else {
-        // Encourage retry (spoken by Dr. Coli)
-        const failLine = interaction?.onFailSay?.[0] || "So close! Let’s try together one more time.";
-        dialogueEl.classList.add("active");
-        dialogueTextEl.textContent = failLine;
-        await setDrColi("talk").catch(() => {});
-        await speakLine(failLine);
-        await setDrColi("idle").catch(() => {});
+        // If scene changed while recording/transcribing, ignore the result
+        if (myRun !== sceneRunId) return;
 
-        // Bring back glow so user knows to tap again
-        micButtonEl.classList.add("attention");
+        micButtonEl.classList.remove("listening");
+        micButtonEl.disabled = false;
+
+        if (result.ok) {
+          await celebrateCorrect(
+            interaction?.onSuccessSay?.[0] || "Yes!! Amazing job!"
+          );
+          if (myRun !== sceneRunId) return;
+          micButtonEl.classList.add("hidden");
+          playScene(currentSceneIndex + 1);
+        } else {
+          // Encourage retry (spoken by Dr. Coli)
+          const failLine =
+            interaction?.onFailSay?.[0] ||
+            "So close! Let’s try together one more time.";
+          dialogueEl.classList.add("active");
+          dialogueTextEl.textContent = failLine;
+          await setDrColi("talk").catch(() => {});
+          await speakLine(failLine);
+          await setDrColi("idle").catch(() => {});
+          if (myRun !== sceneRunId) return;
+
+          // Bring back glow so user knows to tap again
+          micButtonEl.classList.add("attention");
+        }
+      } finally {
+        micBusy = false;
       }
     };
   }
@@ -607,7 +699,7 @@
   async function listenAndCheckPhrase(targets, strictness) {
     try {
       const list = Array.isArray(targets)
-        ? targets.map(t => String(t || "").trim()).filter(Boolean)
+        ? targets.map((t) => String(t || "").trim()).filter(Boolean)
         : [String(targets || "").trim()].filter(Boolean);
 
       const blob = await recordOnce({ ms: RECORD_MS });
@@ -638,10 +730,12 @@
     const chunks = [];
 
     return await new Promise((resolve, reject) => {
-      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.ondataavailable = (e) => {
+        if (e.data && e.data.size) chunks.push(e.data);
+      };
       rec.onerror = (e) => reject(e.error || e);
       rec.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
+        stream.getTracks().forEach((t) => t.stop());
         resolve(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
       };
       rec.start();
@@ -667,14 +761,88 @@
   }
 
   function toJamo(str) {
-    const CHO = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
-    const JUNG = ["ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ","ㅗ","ㅘ","ㅙ","ㅚ","ㅛ","ㅜ","ㅝ","ㅞ","ㅟ","ㅠ","ㅡ","ㅢ","ㅣ"];
-    const JONG = ["","ㄱ","ㄲ","ㄳ","ㄴ","ㄵ","ㄶ","ㄷ","ㄹ","ㄺ","ㄻ","ㄼ","ㄽ","ㄾ","ㄿ","ㅀ","ㅁ","ㅂ","ㅄ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+    const CHO = [
+      "ㄱ",
+      "ㄲ",
+      "ㄴ",
+      "ㄷ",
+      "ㄸ",
+      "ㄹ",
+      "ㅁ",
+      "ㅂ",
+      "ㅃ",
+      "ㅅ",
+      "ㅆ",
+      "ㅇ",
+      "ㅈ",
+      "ㅉ",
+      "ㅊ",
+      "ㅋ",
+      "ㅌ",
+      "ㅍ",
+      "ㅎ",
+    ];
+    const JUNG = [
+      "ㅏ",
+      "ㅐ",
+      "ㅑ",
+      "ㅒ",
+      "ㅓ",
+      "ㅔ",
+      "ㅕ",
+      "ㅖ",
+      "ㅗ",
+      "ㅘ",
+      "ㅙ",
+      "ㅚ",
+      "ㅛ",
+      "ㅜ",
+      "ㅝ",
+      "ㅞ",
+      "ㅟ",
+      "ㅠ",
+      "ㅡ",
+      "ㅢ",
+      "ㅣ",
+    ];
+    const JONG = [
+      "",
+      "ㄱ",
+      "ㄲ",
+      "ㄳ",
+      "ㄴ",
+      "ㄵ",
+      "ㄶ",
+      "ㄷ",
+      "ㄹ",
+      "ㄺ",
+      "ㄻ",
+      "ㄼ",
+      "ㄽ",
+      "ㄾ",
+      "ㄿ",
+      "ㅀ",
+      "ㅁ",
+      "ㅂ",
+      "ㅄ",
+      "ㅅ",
+      "ㅆ",
+      "ㅇ",
+      "ㅈ",
+      "ㅊ",
+      "ㅋ",
+      "ㅌ",
+      "ㅍ",
+      "ㅎ",
+    ];
 
     let out = "";
     for (const ch of str) {
       const code = ch.charCodeAt(0);
-      if (code < 0xac00 || code > 0xd7a3) { out += ch; continue; }
+      if (code < 0xac00 || code > 0xd7a3) {
+        out += ch;
+        continue;
+      }
       const sIndex = code - 0xac00;
       const cho = Math.floor(sIndex / (21 * 28));
       const jung = Math.floor((sIndex % (21 * 28)) / 28);
@@ -685,7 +853,9 @@
   }
 
   function levenshtein(a, b) {
-    const dp = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+    const dp = Array.from({ length: a.length + 1 }, () =>
+      new Array(b.length + 1).fill(0)
+    );
     for (let i = 0; i <= a.length; i++) dp[i][0] = i;
     for (let j = 0; j <= b.length; j++) dp[0][j] = j;
 
@@ -726,7 +896,8 @@
     // - easy: forgiving for kids (e.g., 안녕하세이요)
     let maxEdits;
     if (strictness === "strict") maxEdits = L <= 10 ? 1 : 2;
-    else if (strictness === "normal") maxEdits = L <= 6 ? 1 : L <= 12 ? 2 : 3;
+    else if (strictness === "normal")
+      maxEdits = L <= 6 ? 1 : L <= 12 ? 2 : 3;
     else maxEdits = L <= 6 ? 2 : L <= 12 ? 3 : 4;
 
     return dist <= maxEdits;
@@ -750,6 +921,11 @@
     }, 150);
 
     spawnFullScreenConfetti();
+
+    // Show praise text in bubble too
+    dialogueEl.classList.add("active");
+    dialogueTextEl.textContent = String(praiseLine || "");
+
     await speakLine(praiseLine);
 
     await setDrColi(prevDr).catch(() => {});
@@ -766,9 +942,9 @@
       img.src = CONFETTI_IMAGES[(Math.random() * CONFETTI_IMAGES.length) | 0];
       img.alt = "";
       img.style.position = "absolute";
-      img.style.left = (Math.random() * w) + "px";
-      img.style.top = (-80 - Math.random() * 160) + "px";
-      img.style.width = (16 + Math.random() * 16) + "px";
+      img.style.left = Math.random() * w + "px";
+      img.style.top = -80 - Math.random() * 160 + "px";
+      img.style.width = 16 + Math.random() * 16 + "px";
       img.style.height = "auto";
       img.style.opacity = String(0.92 + Math.random() * 0.08);
       img.style.zIndex = "100";
@@ -785,16 +961,23 @@
 
       const startDelay = Math.random() * 220;
 
-      const easing = Math.random() < 0.5
-        ? "cubic-bezier(.18,.70,.20,1)"
-        : "cubic-bezier(.10,.80,.25,1)";
+      const easing =
+        Math.random() < 0.5
+          ? "cubic-bezier(.18,.70,.20,1)"
+          : "cubic-bezier(.10,.80,.25,1)";
 
       setTimeout(() => {
         img.animate(
           [
             { transform: `translate(0px, 0px) rotate(${rot0}deg)` },
-            { transform: `translate(${drift * 0.35 + sway}px, ${(h + 120) * 0.45}px) rotate(${rot1}deg)` },
-            { transform: `translate(${drift}px, ${h + 160}px) rotate(${rot2}deg)` }
+            {
+              transform: `translate(${drift * 0.35 + sway}px, ${
+                (h + 120) * 0.45
+              }px) rotate(${rot1}deg)`,
+            },
+            {
+              transform: `translate(${drift}px, ${h + 160}px) rotate(${rot2}deg)`,
+            },
           ],
           { duration: dur, easing, fill: "forwards" }
         );
@@ -849,7 +1032,7 @@
   }
 
   function fadeOutAudio(aud, ms = 900) {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       if (!aud) return resolve();
       const startVol = aud.volume ?? 0;
       const steps = 15;
@@ -860,7 +1043,10 @@
         aud.volume = Math.max(0, startVol * (1 - t));
         if (i >= steps) {
           clearInterval(iv);
-          try { aud.pause(); aud.currentTime = 0; } catch {}
+          try {
+            aud.pause();
+            aud.currentTime = 0;
+          } catch {}
           aud.volume = startVol; // reset for next time
           resolve();
         }
@@ -883,7 +1069,7 @@
   }
 
   function sleep(ms) {
-    return new Promise(r => setTimeout(r, ms));
+    return new Promise((r) => setTimeout(r, ms));
   }
 
   function clamp(v, min, max) {
