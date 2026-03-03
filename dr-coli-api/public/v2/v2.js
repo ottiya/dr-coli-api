@@ -2,6 +2,7 @@
 /* Pixi v7 + lazy-load sheets + ElevenLabs TTS + OpenAI STT mic check (kid-forgiving) */
 
 (() => {
+  // Guard: if the script accidentally gets included twice, do nothing the second time.
   if (window.__DRCOLI_V2_BOOTED__) return;
   window.__DRCOLI_V2_BOOTED__ = true;
 
@@ -11,12 +12,15 @@
   const CHARACTER_MANIFEST_URL = "/assets/characters.manifest.json";
 
   // TTS tuning
-  const TTS_RATE = 1.25;           // faster speaking
-  const BETWEEN_LINES_MS = 80;     // less delay between lines
+  const TTS_RATE = 1.25;           // faster speaking (client-side rate)
+  const BETWEEN_LINES_MS = 80;
 
-  // STT tuning
+  // STT tuning (uses your existing /api/stt proxy)
   const STT_MODEL = "gpt-4o-mini-transcribe"; // or "gpt-4o-transcribe"
   const STT_LANGUAGE = "ko";
+
+  // Animation tuning
+  const DEFAULT_ANIM_SPEED = 0.20; // a bit faster overall
 
   // ===== Game state =====
   let currentSceneIndex = 0;
@@ -33,11 +37,14 @@
 
   // Cache: character -> state -> textures[]
   const textureCache = { drColi: {}, bori: {} };
+
+  // Track current states so we can restore after celebrations
   const charState = { drColi: "idle", bori: "idle" };
 
-  // Audio unlock gate
+  // Audio unlock / mic permission
   let userInteracted = false;
   let unlockPromise = null;
+  let micPrewarmed = false;
 
   document.addEventListener("DOMContentLoaded", () => {
     bgLayer = document.getElementById("bgLayer");
@@ -49,11 +56,14 @@
     stageLayerEl = document.getElementById("stageLayer");
 
     if (!bgLayer || !dialogueEl || !dialogueTextEl || !emojiTrayEl || !micButtonEl || !fxLayerEl || !stageLayerEl) {
-      console.error("Missing required DOM elements. Check index.html for: bgLayer, stageLayer, UI elements.");
+      console.error("Missing required DOM elements. Check index.html for: bgLayer, stageLayer, ui elements.");
       return;
     }
 
+    // Move dialogue up so it doesn't cover characters (works with your existing CSS)
     applyDialogueLayoutFix();
+
+    // Create overlay to satisfy autoplay restrictions + ask mic permission once
     ensureStartOverlay();
 
     boot().catch(err => console.error("BOOT ERROR:", err));
@@ -63,7 +73,7 @@
     setBackground(DEFAULT_BG);
     initPixi();
 
-    // Pixi v7 Assets init
+    // Init Assets system (Pixi v7)
     if (PIXI.Assets?.init) {
       await PIXI.Assets.init({ manifest: null }).catch(() => {});
     }
@@ -75,16 +85,13 @@
     ]);
 
     episodeData = ep;
+    characterManifest = man;
 
-    // Support either:
-    // { drColi: {...}, bori: {...} } OR { "drColi": {...}, "bori": {...} } OR { drColi:... } etc.
-    characterManifest = normalizeManifest(man);
-
-    // Fast boot: load minimum states only
+    // Fast boot: load only the minimum
     await Promise.all([
       ensureStateLoaded("drColi", "idle"),
       ensureStateLoaded("bori", "idle"),
-      // prewarm common ones (optional)
+      // prewarm common ones (optional; ignore if missing)
       ensureStateLoaded("drColi", "talk").catch(() => {}),
       ensureStateLoaded("bori", "look").catch(() => {}),
     ]);
@@ -93,46 +100,30 @@
     playScene(0);
   }
 
-  function normalizeManifest(man) {
-    // If someone wraps inside { drColi: ..., bori: ... } we're good.
-    // If it’s { "drColi":..., "bori":... } we're good.
-    // If it's { "DrColi":... } etc, we fallback with best effort.
-    const out = { drColi: null, bori: null };
-
-    out.drColi = man?.drColi || man?.DrColi || man?.drcoli || man?.["dr-coli"] || man?.["dr_coli"] || null;
-    out.bori = man?.bori || man?.Bori || null;
-
-    // If it's already {drColi:{...}, bori:{...}} keep as is
-    if (man?.drColi && man?.bori) return man;
-
-    // If it has top-level keys that look correct, return original
-    if (man?.drColi || man?.bori) return { drColi: out.drColi || man.drColi, bori: out.bori || man.bori };
-
-    // Otherwise just return original and let ensureStateLoaded try direct access
-    return man;
-  }
-
+  // ===== Helpers =====
   async function fetchJSON(url) {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
     return await res.json();
   }
 
-  // ===== UI layout fixes =====
+  function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+  }
+
+  // ===== Layout fix =====
   function applyDialogueLayoutFix() {
-    // Move bubble near top so it doesn't cover characters
     dialogueEl.style.left = "50%";
     dialogueEl.style.transform = "translateX(-50%)";
     dialogueEl.style.top = "18px";
     dialogueEl.style.bottom = "auto";
     dialogueEl.style.width = "min(92vw, 900px)";
     dialogueEl.style.height = "auto";
-
-    // Responsive text sizing
     dialogueTextEl.style.fontSize = "clamp(18px, 3.2vw, 38px)";
-    dialogueTextEl.style.top = "22px";
-    dialogueTextEl.style.left = "52px";
-    dialogueTextEl.style.right = "52px";
   }
 
   // ===== Background =====
@@ -150,14 +141,14 @@
     pixiApp = new PIXI.Application({
       backgroundAlpha: 0,
       resizeTo: stageLayerEl,
-      antialias: true,
+      antialias: true
     });
 
     stageLayerEl.appendChild(pixiApp.view);
     window.addEventListener("resize", positionCharacters);
   }
 
-  // ===== Create & place characters =====
+  // ===== Characters =====
   function createCharacters() {
     const drIdle = textureCache.drColi.idle || [];
     const boriIdle = textureCache.bori.idle || [];
@@ -173,9 +164,8 @@
 
     positionCharacters();
 
-    // Start idle
-    playCharacterState(drColiSprite, drIdle, { pingpong: true });
-    playCharacterState(boriSprite, boriIdle, { pingpong: true });
+    setDrColi("idle").catch(() => {});
+    setBori("idle").catch(() => {});
   }
 
   function positionCharacters() {
@@ -184,12 +174,10 @@
     const w = pixiApp.renderer.width;
     const h = pixiApp.renderer.height;
 
-    // scale down on small screens
-    const scale = clamp(w / 1200, 0.33, 0.60);
+    const scale = clamp(w / 1200, 0.33, 0.62);
     drColiSprite.scale.set(scale);
     boriSprite.scale.set(scale);
 
-    // keep them side-by-side
     const groundY = h - clamp(h * 0.06, 24, 52);
     const gap = clamp(w * 0.18, 140, 360);
     const cx = w * 0.5;
@@ -201,37 +189,32 @@
     boriSprite.y = groundY;
   }
 
-  // ===== State setters (lazy load on demand) =====
   async function setDrColi(state, opts = {}) {
     charState.drColi = state;
     await ensureStateLoaded("drColi", state);
-    playCharacterState(drColiSprite, textureCache.drColi[state], { pingpong: shouldPingPong(state), ...opts });
+    playCharacterState(drColiSprite, textureCache.drColi[state], { ...opts });
   }
 
   async function setBori(state, opts = {}) {
     charState.bori = state;
     await ensureStateLoaded("bori", state);
-    playCharacterState(boriSprite, textureCache.bori[state], { pingpong: shouldPingPong(state), ...opts });
+    playCharacterState(boriSprite, textureCache.bori[state], { ...opts });
   }
 
-  function shouldPingPong(state) {
-    return state === "idle" || state === "look" || state === "talk";
-  }
-
-  function playCharacterState(sprite, textures, { pingpong = false, once = false, speed = 0.13 } = {}) {
+  function playCharacterState(sprite, textures, { speed = DEFAULT_ANIM_SPEED } = {}) {
     if (!sprite) return;
 
     if (!textures || textures.length === 0) {
-      sprite.animationSpeed = 0;
       sprite.stop();
       return;
     }
 
     sprite.textures = textures;
-    sprite.animationSpeed = Math.abs(speed);
 
-    if (pingpong && textures.length > 1) {
+    // Always ping-pong for smooth motion (if multiple frames)
+    if (textures.length > 1) {
       sprite.loop = false;
+      sprite.animationSpeed = Math.abs(speed);
       sprite.gotoAndPlay(0);
 
       sprite.onComplete = () => {
@@ -241,8 +224,9 @@
       };
     } else {
       sprite.onComplete = null;
-      sprite.loop = !once;
-      sprite.gotoAndPlay(0);
+      sprite.loop = true;
+      sprite.animationSpeed = 0;
+      sprite.gotoAndStop(0);
     }
   }
 
@@ -250,7 +234,7 @@
   async function ensureStateLoaded(characterKey, stateName) {
     if (textureCache[characterKey]?.[stateName]?.length) return;
 
-    const entry = getManifestEntry(characterKey, stateName);
+    const entry = characterManifest?.[characterKey]?.[stateName];
     if (!entry) {
       textureCache[characterKey][stateName] = [];
       return;
@@ -265,22 +249,6 @@
     }
 
     textureCache[characterKey][stateName] = textures;
-  }
-
-  function getManifestEntry(characterKey, stateName) {
-    // try normalized manifest first
-    const base = characterManifest?.[characterKey] || null;
-    if (base && base[stateName]) return base[stateName];
-
-    // fallback: try direct (if manifest itself is already {drColi:{...}})
-    if (characterManifest?.drColi && characterKey === "drColi" && characterManifest.drColi[stateName]) {
-      return characterManifest.drColi[stateName];
-    }
-    if (characterManifest?.bori && characterKey === "bori" && characterManifest.bori[stateName]) {
-      return characterManifest.bori[stateName];
-    }
-
-    return null;
   }
 
   async function loadSpritesheetTexturesSafe(jsonUrl, label) {
@@ -331,8 +299,8 @@
     const boriAnim = scene.bori?.animation || null;
 
     if (drAnim === "bow" || boriAnim === "bow") {
-      setDrColi("bow").catch(() => {});
-      setBori("bow").catch(() => {});
+      setDrColi("bow", { speed: 0.18 }).catch(() => {});
+      setBori("bow", { speed: 0.18 }).catch(() => {});
     } else {
       setDrColi(drAnim).catch(() => {});
       if (boriAnim) setBori(boriAnim).catch(() => {});
@@ -347,28 +315,44 @@
 
   async function playDialogue(lines, done) {
     if (!lines || lines.length === 0) {
-      dialogueEl.classList.remove("active");
-      dialogueTextEl.textContent = "";
+      hideDialogue();
       done?.();
       return;
     }
 
-    dialogueEl.classList.add("active");
-
-    for (const line of lines) {
-      dialogueTextEl.textContent = line;
-      await speakLine(line);
-      await sleep(BETWEEN_LINES_MS);
-    }
-
+    showDialogue();
+    await drColiSay(lines);
     done?.();
   }
 
-  function sleep(ms) {
-    return new Promise(r => setTimeout(r, ms));
+  function showDialogue() {
+    dialogueEl.style.display = "block";
   }
 
-  // ===== Audio unlock overlay (fixes NotAllowedError) =====
+  function hideDialogue() {
+    dialogueEl.style.display = "none";
+    dialogueTextEl.textContent = "";
+  }
+
+  // ===== Dr. Coli bubble + voice helper =====
+  async function drColiSay(lines) {
+    const arr = Array.isArray(lines) ? lines : [lines];
+    showDialogue();
+
+    for (const line of arr) {
+      const msg = String(line ?? "").trim();
+      if (!msg) continue;
+
+      dialogueTextEl.textContent = msg;
+      await setDrColi("talk").catch(() => {});
+      await speakLine(msg);
+      await sleep(BETWEEN_LINES_MS);
+    }
+
+    setDrColi(charState.drColi).catch(() => {});
+  }
+
+  // ===== Start overlay (unlocks audio + asks mic permission early) =====
   function ensureStartOverlay() {
     if (document.getElementById("startOverlay")) return;
 
@@ -395,6 +379,7 @@
       userInteracted = true;
       overlay.remove();
       await unlockAudioContext();
+      await prewarmMicPermission();
     }, { once: true });
 
     document.body.appendChild(overlay);
@@ -413,9 +398,7 @@
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.01);
-    } catch {
-      // non-fatal
-    }
+    } catch {}
   }
 
   async function waitForUserInteraction() {
@@ -434,6 +417,21 @@
     await unlockPromise;
   }
 
+  async function prewarmMicPermission() {
+    if (micPrewarmed) return true;
+    if (!navigator.mediaDevices?.getUserMedia) return false;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      micPrewarmed = true;
+      return true;
+    } catch (e) {
+      console.warn("Mic permission denied/unavailable:", e);
+      return false;
+    }
+  }
+
   // ===== ElevenLabs TTS =====
   async function speakLine(text) {
     try {
@@ -442,11 +440,12 @@
       const res = await fetch("/api/tts-elevenlabs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text })
       });
 
       if (!res.ok) {
-        console.warn("ElevenLabs TTS error:", res.status);
+        const detail = await res.text().catch(() => "");
+        console.warn("ElevenLabs TTS error:", res.status, detail.slice(0, 200));
         return;
       }
 
@@ -474,6 +473,7 @@
     emojiTrayEl.classList.add("hidden");
     emojiTrayEl.classList.remove("active");
     micButtonEl.classList.add("hidden");
+    micButtonEl.classList.remove("listening");
     micButtonEl.onclick = null;
 
     if (type === "none") return autoAdvance();
@@ -487,7 +487,7 @@
     setTimeout(() => playScene(currentSceneIndex + 1), 350);
   }
 
-  // ===== Emoji interaction =====
+  // ===== Emoji =====
   function showEmojiInteraction(interaction) {
     const choices = interaction.choices || [];
     const correctIndex = interaction.correctIndex ?? 0;
@@ -507,68 +507,81 @@
             playScene(currentSceneIndex + 1);
           }, 200);
         } else {
-          await speakLine(interaction.onWrongSay?.[0] || "So close! Let’s try again.");
+          await drColiSay(interaction.onWrongSay?.[0] || "Nice try! Let’s try again.");
         }
       };
     });
   }
 
-  // ===== Mic interaction (OpenAI STT + kid-forgiving) =====
+  // ===== Mic (OpenAI STT + forgiving match) =====
   function showMicInteraction(interaction) {
-    // We'll keep this generic for now. Later, when you share episode-01.json,
-    // we can map exact fields.
-    const target = (interaction.target || interaction.phrase || interaction.expected || "").trim();
+    const targets = Array.isArray(interaction.targets)
+      ? interaction.targets.map(t => String(t).trim()).filter(Boolean)
+      : [(interaction.target || "")].map(t => String(t).trim()).filter(Boolean);
 
     const prompt =
       interaction.prompt ||
-      (target ? `Tap the mic, then say: ${target}` : "Tap the mic, then speak!");
+      (targets[0] ? `Tap the mic, then say ${targets[0]}!` : "Tap the mic, then speak!");
 
     micButtonEl.classList.remove("hidden");
+    micButtonEl.classList.remove("listening");
 
-    // Show prompt in bubble (optional)
-    dialogueEl.classList.add("active");
-    dialogueTextEl.textContent = prompt;
+    // Speak prompt (so they hear it), then enable mic
+    micButtonEl.disabled = true;
+    drColiSay(prompt).finally(() => {
+      micButtonEl.disabled = false;
+    });
 
     micButtonEl.onclick = async () => {
       await waitForUserInteraction();
+      await prewarmMicPermission();
 
-      // visual feedback
-      setDrColi("talk").catch(() => {});
-      setBori("look").catch(() => {});
+      micButtonEl.classList.add("listening");
+      micButtonEl.disabled = true;
 
-      const ok = await listenAndCheckPhrase(target);
+      const { ok } = await listenAndCheckPhrase(targets, interaction.strictness);
+
+      micButtonEl.classList.remove("listening");
+      micButtonEl.disabled = false;
 
       if (ok) {
-        await celebrateCorrect(interaction.onSuccessSay?.[0] || interaction.onCorrectSay?.[0] || "Yes!! Amazing job!");
+        await celebrateCorrect(interaction.onSuccessSay?.[0] || "Yes!! Amazing job!");
         micButtonEl.classList.add("hidden");
         playScene(currentSceneIndex + 1);
       } else {
-        await speakLine(interaction.onFailSay?.[0] || interaction.onWrongSay?.[0] || "Let’s try again!");
-        // keep mic visible so they can retry
+        await drColiSay(interaction.onFailSay?.[0] || "So close! Let’s try together one more time.");
       }
     };
   }
 
-  async function listenAndCheckPhrase(target) {
-    if (!target) return true;
+  async function listenAndCheckPhrase(targets, strictness) {
+    const hasTargets = Array.isArray(targets) && targets.length > 0;
 
     try {
       const blob = await recordOnce({ ms: 2600 });
       const transcript = await sttViaOpenAI(blob);
-
       console.log("STT transcript:", transcript);
 
-      return kidForgivingMatch(transcript, target);
+      // If transcript empty => FAIL (prevents auto-success)
+      const cleaned = normalizeKo(transcript);
+      if (!cleaned) return { ok: false, transcript: transcript || "" };
+
+      if (!hasTargets) return { ok: true, transcript };
+
+      for (const t of targets) {
+        if (kidForgivingMatchAdvanced(transcript, t, strictness)) {
+          return { ok: true, transcript };
+        }
+      }
+      return { ok: false, transcript };
     } catch (e) {
       console.warn("STT mic flow failed:", e);
-      return false;
+      return { ok: false, transcript: "" };
     }
   }
 
-  // Record once (MediaRecorder)
   async function recordOnce({ ms = 2600 } = {}) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
     const rec = new MediaRecorder(stream);
     const chunks = [];
 
@@ -585,17 +598,14 @@
     });
   }
 
-  // Calls your existing /api/stt.js proxy (multipart forwarded as-is to OpenAI)
   async function sttViaOpenAI(blob) {
     const fd = new FormData();
-
-    // IMPORTANT: must be "file" because OpenAI expects it and your proxy forwards raw multipart
     fd.append("file", blob, "speech.webm");
     fd.append("model", STT_MODEL);
     fd.append("language", STT_LANGUAGE);
 
     const res = await fetch("/api/stt", { method: "POST", body: fd });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     return (data?.text || "").trim();
   }
 
@@ -606,7 +616,6 @@
       .replace(/[\s\.\,\!\?\-_\(\)\[\]\{\}"'~]/g, "");
   }
 
-  // Hangul syllable -> jamo decomposition
   function toJamo(str) {
     const CHO = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
     const JUNG = ["ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ","ㅗ","ㅘ","ㅙ","ㅚ","ㅛ","ㅜ","ㅝ","ㅞ","ㅟ","ㅠ","ㅡ","ㅢ","ㅣ"];
@@ -643,44 +652,47 @@
     return dp[a.length][b.length];
   }
 
-  function kidForgivingMatch(spoken, target) {
+  function kidForgivingMatchAdvanced(spoken, target, strictness) {
     const s0 = normalizeKo(spoken);
     const t0 = normalizeKo(target);
     if (!s0 || !t0) return false;
     if (s0 === t0) return true;
 
-    // Allow common trailing “extra sounds”
     const s = s0.replace(/(요|이요|으)$/g, "");
     const t = t0.replace(/(요|이요|으)$/g, "");
 
-    // Kids may say extra words (or STT may add extras)
     if (s.includes(t) || t.includes(s)) return true;
 
     const sj = toJamo(s);
     const tj = toJamo(t);
-
     const dist = levenshtein(sj, tj);
     const L = Math.max(sj.length, tj.length);
 
-    // Forgiving threshold based on length
-    const maxEdits = L <= 6 ? 1 : L <= 12 ? 2 : 3;
+    let maxEdits;
+    if (strictness === "strict") {
+      maxEdits = 1;
+    } else if (strictness === "easy") {
+      maxEdits = L <= 6 ? 2 : L <= 12 ? 3 : 4;
+    } else {
+      maxEdits = L <= 6 ? 1 : L <= 12 ? 2 : 3;
+    }
 
     return dist <= maxEdits;
   }
 
-  // ===== Celebration + confetti =====
+  // ===== Celebration (confetti + praise voice + text) =====
   async function celebrateCorrect(praiseLine) {
     const prevDr = charState.drColi;
     const prevBori = charState.bori;
 
-    await setDrColi("wave").catch(() => {});
-    await setBori("wave").catch(() => {});
+    setDrColi("wave", { speed: 0.22 }).catch(() => {});
+    setBori("wave", { speed: 0.22 }).catch(() => {});
 
     spawnFullScreenConfetti();
-    await speakLine(praiseLine);
+    await drColiSay(praiseLine);
 
-    await setDrColi(prevDr).catch(() => {});
-    await setBori(prevBori).catch(() => {});
+    setDrColi(prevDr).catch(() => {});
+    setBori(prevBori).catch(() => {});
   }
 
   function spawnFullScreenConfetti() {
@@ -718,10 +730,5 @@
       fxLayerEl.appendChild(piece);
       setTimeout(() => piece.remove(), dur + 200);
     }
-  }
-
-  // ===== utils =====
-  function clamp(v, min, max) {
-    return Math.max(min, Math.min(max, v));
   }
 })();
