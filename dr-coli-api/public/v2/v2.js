@@ -1,56 +1,53 @@
 /* public/v2/v2.js
-   Pixi v7 + lazy-load sheets + ElevenLabs TTS + OpenAI STT mic check (kid-forgiving)
-   Feel polish:
-   - Bori mostly idle (look 20% during speech, 10% during downtime)
-   - When waiting for interaction: both idle
-   - Grounding: align feet + move closer to bottom
-   - Mic glow after prompt (adds .attention class)
-   - Confetti uses /assets/ui PNGs
-   - Smoother ping-pong + natural frame sort to reduce jerk
+   - Pixi v7 animated characters (Dr. Coli + Bori)
+   - Episode JSON scenes with dialogue + interactions (mic + emoji)
+   - ElevenLabs TTS via /api/tts-elevenlabs
+   - OpenAI STT via /api/stt (multipart)
+   - Confetti upgraded ONLY (slower, varied, sway, two waves)
 */
 
 (() => {
+  // prevent double-boot
   if (window.__DRCOLI_V2_BOOTED__) return;
   window.__DRCOLI_V2_BOOTED__ = true;
 
-  // ===== Constants =====
+  // ===== Config =====
   const DEFAULT_BG = "/assets/backgrounds/bg-puppies.png";
   const EPISODE_URL = "/lessons/episode-01.json";
   const CHARACTER_MANIFEST_URL = "/assets/characters.manifest.json";
 
-  // TTS tuning
+  // TTS
   const TTS_RATE = 1.25;
   const BETWEEN_LINES_MS = 80;
 
-  // STT tuning
-  const STT_MODEL = "gpt-4o-mini-transcribe"; // or "gpt-4o-transcribe"
+  // STT
+  const STT_MODEL = "gpt-4o-mini-transcribe";
   const STT_LANGUAGE = "ko";
+  const RECORD_MS = 2600;
 
-  // Animation tuning
-  const DEFAULT_ANIM_SPEED = 0.22; // slightly faster overall
+  // Animation
+  const DEFAULT_ANIM_SPEED = 0.22;
 
   // Bori behavior
   const BORIS_LOOK_DURING_SPEECH = 0.20;   // 20%
-  const BORIS_LOOK_DURING_DOWNTIME = 0.10; // 10% (50% less than speech)
+  const BORIS_LOOK_DURING_DOWNTIME = 0.10; // 10%
   const BORIS_DOWNTIME_REROLL_MS_MIN = 1600;
   const BORIS_DOWNTIME_REROLL_MS_MAX = 3200;
 
-  // Position tuning
-  const GROUND_MARGIN_RATIO = 0.028; // smaller = closer to bottom
+  // Positioning (simple + stable; you can tweak these later)
+  const CHAR_SCALE_MIN = 0.30;
+  const CHAR_SCALE_MAX = 0.62;
+  const GAP_MIN = 140;
+  const GAP_MAX = 360;
+  const GROUND_MARGIN_RATIO = 0.028;
   const GROUND_MARGIN_MIN = 14;
   const GROUND_MARGIN_MAX = 34;
 
-  const CHAR_SCALE_MIN = 0.33;
-  const CHAR_SCALE_MAX = 0.62;
-
-  const GAP_MIN = 140;
-  const GAP_MAX = 360;
-
-  // Per-character baseline offsets (to align "feet" if spritesheets differ)
+  // Optional small offsets (feet alignment)
   const DRCOLI_Y_OFFSET = 0;
-  const BORI_Y_OFFSET = 10; // adjust +/- if needed after you see it
+  const BORI_Y_OFFSET = 10;
 
-  // Confetti assets (120x120 -> we render around ~24px)
+  // Confetti assets (make sure these exist in public/assets/ui/)
   const CONFETTI_IMAGES = [
     "/assets/ui/confetti-blue-ribbon.png",
     "/assets/ui/confetti-golden-ribbon.png",
@@ -70,24 +67,21 @@
 
   // cache: characterKey -> stateName -> textures[]
   const textureCache = { drColi: {}, bori: {} };
-
-  // Current requested states (what we *want* them to be)
   const charState = { drColi: "idle", bori: "idle" };
 
-  // UI + DOM
+  // DOM
   let bgLayer, dialogueEl, dialogueTextEl, emojiTrayEl, micButtonEl, fxLayerEl, stageLayerEl;
 
-  // Interaction gates
+  // gating
   let userInteracted = false;
   let unlockPromise = null;
   let micPrewarmed = false;
-
-  // Whether we're currently in an interaction waiting state
   let interactionActive = false;
 
-  // Bori downtime timer
+  // downtime
   let boriDowntimeTimer = null;
 
+  // ===== Boot =====
   document.addEventListener("DOMContentLoaded", () => {
     bgLayer = document.getElementById("bgLayer");
     dialogueEl = document.getElementById("dialogue");
@@ -98,7 +92,7 @@
     stageLayerEl = document.getElementById("stageLayer");
 
     if (!bgLayer || !dialogueEl || !dialogueTextEl || !emojiTrayEl || !micButtonEl || !fxLayerEl || !stageLayerEl) {
-      console.error("Missing required DOM elements. Check index.html for: bgLayer, stageLayer, UI elements.");
+      console.error("Missing DOM elements. Need: bgLayer, stageLayer, dialogue, dialogueText, emojiTray, micButton, fxLayer.");
       return;
     }
 
@@ -124,7 +118,7 @@
     episodeData = ep;
     characterManifest = normalizeManifest(man);
 
-    // Fast boot
+    // preload minimal states for faster start
     await Promise.all([
       ensureStateLoaded("drColi", "idle"),
       ensureStateLoaded("bori", "idle"),
@@ -136,70 +130,16 @@
     playScene(0);
   }
 
-  function normalizeManifest(man) {
-    if (!man || typeof man !== "object") return man;
-    if (man.drColi && man.bori) return man;
-
-    const out = {};
-    out.drColi = man.drColi || man.DrColi || man.drcoli || man["dr-coli"] || man["dr_coli"] || null;
-    out.bori = man.bori || man.Bori || null;
-
-    if (out.drColi || out.bori) return out;
-    return man;
-  }
-
-  async function fetchJSON(url) {
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
-    return await res.json();
-  }
-
-  function sleep(ms) {
-    return new Promise(r => setTimeout(r, ms));
-  }
-
-  function clamp(v, min, max) {
-    return Math.max(min, Math.min(max, v));
-  }
-
-  // ===== UI layout fixes =====
-  function applyDialogueLayoutFix() {
-    dialogueEl.style.left = "50%";
-    dialogueEl.style.transform = "translateX(-50%)";
-    dialogueEl.style.top = "18px";
-    dialogueEl.style.bottom = "auto";
-    dialogueEl.style.width = "min(92vw, 900px)";
-    dialogueEl.style.height = "auto";
-
-    dialogueTextEl.style.fontSize = "clamp(18px, 3.2vw, 38px)";
-    dialogueTextEl.style.top = "22px";
-    dialogueTextEl.style.left = "52px";
-    dialogueTextEl.style.right = "52px";
-  }
-
-  // ===== Background =====
-  function setBackground(bgFileOrUrl) {
-    const url =
-      bgFileOrUrl.startsWith("http") || bgFileOrUrl.startsWith("/")
-        ? bgFileOrUrl
-        : `/assets/backgrounds/${bgFileOrUrl}`;
-
-    bgLayer.style.backgroundImage = `url("${url}")`;
-  }
-
-  // ===== Pixi init =====
   function initPixi() {
     pixiApp = new PIXI.Application({
       backgroundAlpha: 0,
       resizeTo: stageLayerEl,
       antialias: true,
     });
-
     stageLayerEl.appendChild(pixiApp.view);
     window.addEventListener("resize", positionCharacters);
   }
 
-  // ===== Create & place characters =====
   function createCharacters() {
     const drIdle = textureCache.drColi.idle || [];
     const boriIdle = textureCache.bori.idle || [];
@@ -215,7 +155,6 @@
 
     positionCharacters();
 
-    // Start idle
     playCharacterState(drColiSprite, drIdle, { speed: DEFAULT_ANIM_SPEED, pingpong: true });
     playCharacterState(boriSprite, boriIdle, { speed: DEFAULT_ANIM_SPEED, pingpong: true });
   }
@@ -230,7 +169,6 @@
     drColiSprite.scale.set(scale);
     boriSprite.scale.set(scale);
 
-    // Closer to bottom
     const margin = clamp(h * GROUND_MARGIN_RATIO, GROUND_MARGIN_MIN, GROUND_MARGIN_MAX);
     const groundY = h - margin;
 
@@ -240,12 +178,40 @@
     drColiSprite.x = cx - gap / 2;
     boriSprite.x = cx + gap / 2;
 
-    // Align “feet” on same ground line (with small offsets if needed)
     drColiSprite.y = groundY + DRCOLI_Y_OFFSET;
     boriSprite.y = groundY + BORI_Y_OFFSET;
   }
 
-  // ===== State setters =====
+  // ===== Animation playback (smooth pingpong) =====
+  function playCharacterState(sprite, textures, { speed = DEFAULT_ANIM_SPEED, pingpong = true } = {}) {
+    if (!sprite) return;
+    if (!textures || textures.length === 0) {
+      sprite.stop();
+      return;
+    }
+    sprite.textures = textures;
+
+    if (textures.length === 1) {
+      sprite.stop();
+      sprite.gotoAndStop(0);
+      return;
+    }
+
+    const abs = Math.abs(speed || DEFAULT_ANIM_SPEED);
+    sprite.loop = true;
+    sprite._pingpong = !!pingpong;
+    sprite._ppAbs = abs;
+    sprite.animationSpeed = abs;
+
+    sprite.onFrameChange = (frame) => {
+      if (!sprite._pingpong) return;
+      if (frame === sprite.textures.length - 1) sprite.animationSpeed = -sprite._ppAbs;
+      else if (frame === 0) sprite.animationSpeed = sprite._ppAbs;
+    };
+
+    sprite.play();
+  }
+
   async function setDrColi(state, opts = {}) {
     charState.drColi = state;
     await ensureStateLoaded("drColi", state);
@@ -258,40 +224,17 @@
     playCharacterState(boriSprite, textureCache.bori[state], { speed: DEFAULT_ANIM_SPEED, pingpong: true, ...opts });
   }
 
-  // ===== Smooth ping-pong =====
-  function playCharacterState(sprite, textures, { speed = DEFAULT_ANIM_SPEED, pingpong = true } = {}) {
-    if (!sprite) return;
+  // ===== Loading =====
+  function normalizeManifest(man) {
+    if (!man || typeof man !== "object") return man;
+    if (man.drColi && man.bori) return man;
 
-    if (!textures || textures.length === 0) {
-      sprite.stop();
-      return;
-    }
-
-    sprite.textures = textures;
-
-    if (textures.length === 1) {
-      sprite.stop();
-      sprite.gotoAndStop(0);
-      return;
-    }
-
-    // Smooth pingpong using onFrameChange reversal (no stop/restart)
-    const abs = Math.abs(speed || DEFAULT_ANIM_SPEED);
-
-    sprite.loop = true;
-    sprite.animationSpeed = abs;
-    sprite._pingpong = !!pingpong;
-
-    sprite.onFrameChange = (frame) => {
-      if (!sprite._pingpong) return;
-      if (frame === textures.length - 1) sprite.animationSpeed = -abs;
-      else if (frame === 0) sprite.animationSpeed = abs;
-    };
-
-    sprite.play();
+    const out = {};
+    out.drColi = man.drColi || man.DrColi || man.drcoli || man["dr-coli"] || man["dr_coli"] || null;
+    out.bori = man.bori || man.Bori || null;
+    return (out.drColi || out.bori) ? out : man;
   }
 
-  // ===== Manifest-driven lazy loading =====
   async function ensureStateLoaded(characterKey, stateName) {
     if (textureCache[characterKey]?.[stateName]?.length) return;
 
@@ -329,27 +272,40 @@
   async function loadSpritesheetTexturesSafe(jsonUrl, label) {
     try {
       const loaded = await PIXI.Assets.load(jsonUrl);
-
       const sheet =
         loaded?.textures ? loaded :
         loaded?.spritesheet?.textures ? loaded.spritesheet :
         null;
 
       if (!sheet || !sheet.textures) {
-        console.warn(`[sheet] No textures found for ${label}: ${jsonUrl}`);
+        console.warn(`[sheet] No textures for ${label}: ${jsonUrl}`);
         return [];
       }
 
-      // Natural numeric sort to reduce jerkiness (e.g. 1,2,3...10 not 1,10,2)
       const keys = Object.keys(sheet.textures).sort(naturalCompare);
       return keys.map(k => sheet.textures[k]);
     } catch (err) {
-      console.error(`[sheet] Failed to load ${label}: ${jsonUrl}`, err);
+      console.error(`[sheet] Failed ${label}: ${jsonUrl}`, err);
       return [];
     }
   }
 
-  // ===== Scene engine =====
+  async function fetchJSON(url) {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`Failed to load ${url}: ${res.status}`);
+    return await res.json();
+  }
+
+  // ===== Background =====
+  function setBackground(bgFileOrUrl) {
+    const url =
+      bgFileOrUrl.startsWith("http") || bgFileOrUrl.startsWith("/")
+        ? bgFileOrUrl
+        : `/assets/backgrounds/${bgFileOrUrl}`;
+    bgLayer.style.backgroundImage = `url("${url}")`;
+  }
+
+  // ===== Dialogue flow =====
   function playScene(index) {
     stopBoriDowntime();
     interactionActive = false;
@@ -360,17 +316,11 @@
 
     setBackground(scene.background || episodeData.background || DEFAULT_BG);
 
-    // Use scene-provided animations for first pose, but Bori policy may override during speech.
-    const drAnim = scene.drColi?.animation || "idle";
-    const boriAnim = scene.bori?.animation || "idle";
-
-    setDrColi(drAnim).catch(() => {});
-    setBori(boriAnim).catch(() => {});
+    setDrColi(scene.drColi?.animation || "idle").catch(() => {});
+    setBori(scene.bori?.animation || "idle").catch(() => {});
 
     const lines = scene.drColi?.say || [];
-    playDialogue(lines, () => {
-      enableInteraction(scene.interaction || { type: "none" });
-    });
+    playDialogue(lines, () => enableInteraction(scene.interaction || { type: "none" }));
   }
 
   async function playDialogue(lines, done) {
@@ -379,7 +329,6 @@
       done?.();
       return;
     }
-
     showDialogue();
     await drColiSay(lines);
     done?.();
@@ -394,15 +343,12 @@
     dialogueTextEl.textContent = "";
   }
 
-  // ===== Bori “listening” policy =====
   async function setBoriDuringSpeech() {
-    // Only do this if we are not in interaction waiting mode
     if (interactionActive) {
       await setBori("idle").catch(() => {});
       return;
     }
-    const r = Math.random();
-    if (r < BORIS_LOOK_DURING_SPEECH) await setBori("look").catch(() => {});
+    if (Math.random() < BORIS_LOOK_DURING_SPEECH) await setBori("look").catch(() => {});
     else await setBori("idle").catch(() => {});
   }
 
@@ -412,18 +358,17 @@
 
     const reroll = async () => {
       if (interactionActive) return;
-      // 10% look during downtime, otherwise idle
-      if (Math.random() < BORIS_LOOK_DURING_DOWNTIME) {
-        await setBori("look").catch(() => {});
-      } else {
-        await setBori("idle").catch(() => {});
-      }
-      const next = BORIS_DOWNTIME_REROLL_MS_MIN + Math.random() * (BORIS_DOWNTIME_REROLL_MS_MAX - BORIS_DOWNTIME_REROLL_MS_MIN);
+
+      if (Math.random() < BORIS_LOOK_DURING_DOWNTIME) await setBori("look").catch(() => {});
+      else await setBori("idle").catch(() => {});
+
+      const next = BORIS_DOWNTIME_REROLL_MS_MIN +
+        Math.random() * (BORIS_DOWNTIME_REROLL_MS_MAX - BORIS_DOWNTIME_REROLL_MS_MIN);
+
       boriDowntimeTimer = setTimeout(reroll, next);
     };
 
-    const first = 600 + Math.random() * 800;
-    boriDowntimeTimer = setTimeout(reroll, first);
+    boriDowntimeTimer = setTimeout(reroll, 650 + Math.random() * 850);
   }
 
   function stopBoriDowntime() {
@@ -431,7 +376,6 @@
     boriDowntimeTimer = null;
   }
 
-  // ===== Dr. Coli bubble + voice helper =====
   async function drColiSay(lines) {
     stopBoriDowntime();
     const arr = Array.isArray(lines) ? lines : [lines];
@@ -444,13 +388,12 @@
       dialogueTextEl.textContent = msg;
 
       await setDrColi("talk").catch(() => {});
-      await setBoriDuringSpeech(); // <-- main “Bori mostly idle while speech” behavior
+      await setBoriDuringSpeech();
 
       await speakLine(msg);
       await sleep(BETWEEN_LINES_MS);
     }
 
-    // After speech ends: return to idle + start downtime behavior (if not interacting)
     await setDrColi("idle").catch(() => {});
     if (!interactionActive) {
       await setBori("idle").catch(() => {});
@@ -458,7 +401,7 @@
     }
   }
 
-  // ===== Start overlay (unlocks audio + asks mic permission early) =====
+  // ===== Audio gate / mic prewarm =====
   function ensureStartOverlay() {
     if (document.getElementById("startOverlay")) return;
 
@@ -475,9 +418,9 @@
     overlay.style.textAlign = "center";
     overlay.style.padding = "24px";
     overlay.innerHTML = `
-      <div style="max-width: 520px;">
-        <div style="font-size: 28px; font-weight: 800; margin-bottom: 10px;">Tap to start</div>
-        <div style="font-size: 16px; opacity: 0.9;">This enables audio + microphone.</div>
+      <div style="max-width:520px;">
+        <div style="font-size:28px;font-weight:900;margin-bottom:10px;">Tap to start</div>
+        <div style="font-size:16px;opacity:.9;">Enables audio + microphone.</div>
       </div>
     `;
 
@@ -489,6 +432,21 @@
     }, { once: true });
 
     document.body.appendChild(overlay);
+  }
+
+  async function waitForUserInteraction() {
+    if (userInteracted) return;
+    if (!unlockPromise) {
+      unlockPromise = new Promise(resolve => {
+        const handler = () => {
+          userInteracted = true;
+          window.removeEventListener("pointerdown", handler);
+          resolve();
+        };
+        window.addEventListener("pointerdown", handler, { once: true });
+      });
+    }
+    await unlockPromise;
   }
 
   async function unlockAudioContext() {
@@ -507,26 +465,9 @@
     } catch {}
   }
 
-  async function waitForUserInteraction() {
-    if (userInteracted) return;
-    if (!unlockPromise) {
-      ensureStartOverlay();
-      unlockPromise = new Promise(resolve => {
-        const handler = () => {
-          userInteracted = true;
-          window.removeEventListener("pointerdown", handler);
-          resolve();
-        };
-        window.addEventListener("pointerdown", handler, { once: true });
-      });
-    }
-    await unlockPromise;
-  }
-
   async function prewarmMicPermission() {
     if (micPrewarmed) return true;
     if (!navigator.mediaDevices?.getUserMedia) return false;
-
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach(t => t.stop());
@@ -549,13 +490,9 @@
         body: JSON.stringify({ text }),
       });
 
-      if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        console.warn("ElevenLabs TTS error:", res.status, detail.slice(0, 200));
-        return;
-      }
+      if (!res.ok) return;
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       const url = data?.url;
       if (!url) return;
 
@@ -564,8 +501,8 @@
 
       await audio.play();
       await new Promise(resolve => {
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
+        audio.onended = resolve;
+        audio.onerror = resolve;
       });
     } catch (err) {
       console.warn("TTS playback failed (non-fatal):", err);
@@ -576,7 +513,7 @@
   function enableInteraction(interaction) {
     const type = interaction?.type || "none";
 
-    // Reset UI
+    // reset UI
     emojiTrayEl.classList.add("hidden");
     emojiTrayEl.classList.remove("active");
     micButtonEl.classList.add("hidden");
@@ -587,7 +524,7 @@
     interactionActive = (type === "mic" || type === "emoji");
     stopBoriDowntime();
 
-    // While waiting for interaction: both idle
+    // while waiting: both idle
     if (interactionActive) {
       setDrColi("idle").catch(() => {});
       setBori("idle").catch(() => {});
@@ -606,7 +543,6 @@
     setTimeout(() => playScene(currentSceneIndex + 1), 350);
   }
 
-  // ===== Emoji =====
   function showEmojiInteraction(interaction) {
     const choices = interaction.choices || [];
     const correctIndex = interaction.correctIndex ?? 0;
@@ -632,7 +568,6 @@
     });
   }
 
-  // ===== Mic (OpenAI STT + forgiving match) =====
   function showMicInteraction(interaction) {
     const targets = Array.isArray(interaction.targets)
       ? interaction.targets.map(t => String(t).trim()).filter(Boolean)
@@ -646,15 +581,14 @@
     micButtonEl.classList.remove("listening");
     micButtonEl.classList.remove("attention");
 
-    // Speak prompt, then glow mic
     micButtonEl.disabled = true;
+
+    // speak prompt, then glow mic
     drColiSay(prompt).finally(() => {
-      // after prompt ends: both idle (waiting)
       setDrColi("idle").catch(() => {});
       setBori("idle").catch(() => {});
-
       micButtonEl.disabled = false;
-      micButtonEl.classList.add("attention"); // <-- glow hook (CSS later)
+      micButtonEl.classList.add("attention");
     });
 
     micButtonEl.onclick = async () => {
@@ -676,7 +610,6 @@
         playScene(currentSceneIndex + 1);
       } else {
         await drColiSay(interaction.onFailSay?.[0] || "So close! Let’s try together one more time.");
-        // stay waiting; glow again
         micButtonEl.classList.add("attention");
         setDrColi("idle").catch(() => {});
         setBori("idle").catch(() => {});
@@ -688,12 +621,11 @@
     const hasTargets = Array.isArray(targets) && targets.length > 0;
 
     try {
-      const blob = await recordOnce({ ms: 2600 });
+      const blob = await recordOnce({ ms: RECORD_MS });
       const transcript = await sttViaOpenAI(blob);
-
       const cleaned = normalizeKo(transcript);
-      if (!cleaned) return { ok: false, transcript: transcript || "" };
 
+      if (!cleaned) return { ok: false, transcript: transcript || "" };
       if (!hasTargets) return { ok: true, transcript };
 
       for (const t of targets) {
@@ -720,7 +652,6 @@
         stream.getTracks().forEach(t => t.stop());
         resolve(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
       };
-
       rec.start();
       setTimeout(() => rec.stop(), ms);
     });
@@ -804,7 +735,7 @@
     return dist <= maxEdits;
   }
 
-  // ===== Celebration =====
+  // ===== Celebration (CONFETTI UPGRADED ONLY) =====
   async function celebrateCorrect(praiseLine) {
     const prevDr = charState.drColi;
     const prevBori = charState.bori;
@@ -812,7 +743,7 @@
     setDrColi("wave", { speed: 0.25 }).catch(() => {});
     setBori("wave", { speed: 0.25 }).catch(() => {});
 
-    spawnImageConfetti();
+    spawnImageConfetti(); // upgraded confetti below
     await drColiSay(praiseLine);
 
     setDrColi(prevDr || "idle").catch(() => {});
@@ -820,38 +751,79 @@
   }
 
   function spawnImageConfetti() {
-    const N = 45;
-    const w = fxLayerEl.clientWidth || window.innerWidth;
-    const h = fxLayerEl.clientHeight || window.innerHeight;
+    // Two waves = more celebration
+    spawnWave(34, 0);
+    spawnWave(26, 220);
 
-    for (let i = 0; i < N; i++) {
-      const img = document.createElement("img");
-      img.src = CONFETTI_IMAGES[(Math.random() * CONFETTI_IMAGES.length) | 0];
-      img.alt = "";
-      img.style.position = "absolute";
-      img.style.left = Math.random() * w + "px";
-      img.style.top = (-40 - Math.random() * 60) + "px";
-      img.style.width = (18 + Math.random() * 12) + "px"; // ~20% of 120px
-      img.style.height = "auto";
-      img.style.opacity = "0.95";
-      img.style.zIndex = "100";
-      img.style.pointerEvents = "none";
-      fxLayerEl.appendChild(img);
+    function spawnWave(count, delayMs) {
+      const w = fxLayerEl.clientWidth || window.innerWidth;
+      const h = fxLayerEl.clientHeight || window.innerHeight;
 
-      const drift = (Math.random() - 0.5) * 280;
-      const dur = 1200 + Math.random() * 900;
-      const rot0 = Math.random() * 360;
-      const rot1 = rot0 + (Math.random() * 720 + 360);
+      for (let i = 0; i < count; i++) {
+        const img = document.createElement("img");
+        img.src = CONFETTI_IMAGES[(Math.random() * CONFETTI_IMAGES.length) | 0];
+        img.alt = "";
+        img.style.position = "absolute";
+        img.style.left = (Math.random() * w) + "px";
+        img.style.top = (-80 - Math.random() * 160) + "px";
+        img.style.pointerEvents = "none";
+        img.style.zIndex = "100";
 
-      img.animate(
-        [
-          { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: 1 },
-          { transform: `translate(${drift}px, ${h + 80}px) rotate(${rot1}deg)`, opacity: 0.98 }
-        ],
-        { duration: dur, easing: "cubic-bezier(.2,.6,.2,1)", fill: "forwards" }
-      );
+        // ~20% of 120px with variety
+        const size = 16 + Math.random() * 16; // 16–32px
+        img.style.width = size + "px";
+        img.style.height = "auto";
+        img.style.opacity = String(0.92 + Math.random() * 0.08);
 
-      setTimeout(() => img.remove(), dur + 200);
+        fxLayerEl.appendChild(img);
+
+        const drift = (Math.random() - 0.5) * 360;
+        const sway = (Math.random() - 0.5) * 180;
+        const dur = 1800 + Math.random() * 2800; // 1.8s–4.6s slower + varied
+
+        const rot0 = Math.random() * 360;
+        const rot1 = rot0 + (Math.random() * 540 + 180);
+        const rot2 = rot1 + (Math.random() * 540 + 180);
+
+        const startDelay = delayMs + Math.random() * 220;
+
+        const easing = Math.random() < 0.5
+          ? "cubic-bezier(.18,.70,.20,1)"
+          : "cubic-bezier(.10,.80,.25,1)";
+
+        setTimeout(() => {
+          img.animate(
+            [
+              { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: img.style.opacity },
+              { transform: `translate(${drift * 0.35 + sway}px, ${(h + 120) * 0.45}px) rotate(${rot1}deg)`, opacity: img.style.opacity },
+              { transform: `translate(${drift}px, ${h + 160}px) rotate(${rot2}deg)`, opacity: "0.98" }
+            ],
+            { duration: dur, easing, fill: "forwards" }
+          );
+
+          setTimeout(() => img.remove(), dur + 250);
+        }, startDelay);
+      }
     }
   }
+
+  // ===== UI tweaks =====
+  function applyDialogueLayoutFix() {
+    dialogueEl.style.left = "50%";
+    dialogueEl.style.transform = "translateX(-50%)";
+    dialogueEl.style.top = "18px";
+    dialogueEl.style.bottom = "auto";
+    dialogueEl.style.width = "min(92vw, 900px)";
+    dialogueEl.style.height = "auto";
+
+    dialogueTextEl.style.fontSize = "clamp(18px, 3.2vw, 38px)";
+    dialogueTextEl.style.top = "22px";
+    dialogueTextEl.style.left = "52px";
+    dialogueTextEl.style.right = "52px";
+  }
+
+  // ===== Utils =====
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
 })();
