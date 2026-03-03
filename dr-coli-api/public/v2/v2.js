@@ -1,12 +1,13 @@
 /* public/v2/v2.js
    Pixi v7 + lazy-load sheets + ElevenLabs TTS + OpenAI STT mic check (kid-forgiving)
-   Feel polish:
-   - Bori mostly idle (look 20% during speech, 10% during downtime)
-   - When waiting for interaction: both idle
-   - Grounding: align feet + move closer to bottom
-   - Mic glow after prompt (adds .attention class)
-   - Confetti uses /assets/ui PNGs
-   - Smoother ping-pong + natural frame sort to reduce jerk
+
+   Polishes in this version:
+   - FIX jitter for trimmed TexturePacker atlases (Bori Idle/Look) via baseline-stabilized Container
+   - Feet locked to a ground line ~24px from bottom
+   - Tight gap between characters (like your red rectangle)
+   - Mobile responsive scaling (no giants)
+   - Confetti slower + highly varied speeds + sway + 2-wave celebration
+   - Bori behavior: mostly idle, some look during Dr. Coli speech, less during downtime; both idle during interactions
 */
 
 (() => {
@@ -35,22 +36,17 @@
   const BORIS_DOWNTIME_REROLL_MS_MIN = 1600;
   const BORIS_DOWNTIME_REROLL_MS_MAX = 3200;
 
-  // Position tuning
-  const GROUND_MARGIN_RATIO = 0.028; // smaller = closer to bottom
-  const GROUND_MARGIN_MIN = 14;
-  const GROUND_MARGIN_MAX = 34;
+  // ===== Layout tuning (matches your red-rectangle goal) =====
+  const GROUND_MARGIN_PX = 24; // feet line = viewportHeight - 24px (your red bar)
+  const GAP_RATIO = 0.085;     // tight gap like your vertical red rectangle
+  const GAP_MIN = 70;
+  const GAP_MAX = 180;
 
-  const CHAR_SCALE_MIN = 0.33;
-  const CHAR_SCALE_MAX = 0.62;
+  // Scale tuning (mobile safe)
+  const SCALE_MIN = 0.22;
+  const SCALE_MAX = 0.60;
 
-  const GAP_MIN = 140;
-  const GAP_MAX = 360;
-
-  // Per-character baseline offsets (to align "feet" if spritesheets differ)
-  const DRCOLI_Y_OFFSET = 0;
-  const BORI_Y_OFFSET = 10; // adjust +/- if needed after you see it
-
-  // Confetti assets (120x120 -> we render around ~24px)
+  // Confetti assets
   const CONFETTI_IMAGES = [
     "/assets/ui/confetti-blue-ribbon.png",
     "/assets/ui/confetti-golden-ribbon.png",
@@ -65,24 +61,30 @@
   let characterManifest = null;
 
   let pixiApp = null;
+
+  // Containers (baseline stabilized)
+  let drColiWrap = null;
+  let boriWrap = null;
+
+  // AnimatedSprites (inside container)
   let drColiSprite = null;
   let boriSprite = null;
 
   // cache: characterKey -> stateName -> textures[]
   const textureCache = { drColi: {}, bori: {} };
 
-  // Current requested states (what we *want* them to be)
+  // Current requested states
   const charState = { drColi: "idle", bori: "idle" };
 
   // UI + DOM
   let bgLayer, dialogueEl, dialogueTextEl, emojiTrayEl, micButtonEl, fxLayerEl, stageLayerEl;
 
-  // Interaction gates
+  // Audio + mic
   let userInteracted = false;
   let unlockPromise = null;
   let micPrewarmed = false;
 
-  // Whether we're currently in an interaction waiting state
+  // Interaction gates
   let interactionActive = false;
 
   // Bori downtime timer
@@ -124,7 +126,7 @@
     episodeData = ep;
     characterManifest = normalizeManifest(man);
 
-    // Fast boot
+    // Fast boot: load minimal states
     await Promise.all([
       ensureStateLoaded("drColi", "idle"),
       ensureStateLoaded("bori", "idle"),
@@ -199,67 +201,92 @@
     window.addEventListener("resize", positionCharacters);
   }
 
-  // ===== Create & place characters =====
+  // ===== Character creation with baseline-stabilized container =====
   function createCharacters() {
     const drIdle = textureCache.drColi.idle || [];
     const boriIdle = textureCache.bori.idle || [];
 
+    // Wrap containers define the "feet point" at (0,0)
+    drColiWrap = new PIXI.Container();
+    boriWrap = new PIXI.Container();
+
+    // AnimatedSprites sit inside wrapper and are positioned per-frame to cancel trim jitter
     drColiSprite = new PIXI.AnimatedSprite(drIdle.length ? drIdle : [PIXI.Texture.WHITE]);
     boriSprite = new PIXI.AnimatedSprite(boriIdle.length ? boriIdle : [PIXI.Texture.WHITE]);
 
-    drColiSprite.anchor.set(0.5, 1);
-    boriSprite.anchor.set(0.5, 1);
+    // IMPORTANT: anchor at top-left because we manually offset based on trim/orig
+    drColiSprite.anchor.set(0, 0);
+    boriSprite.anchor.set(0, 0);
 
-    pixiApp.stage.addChild(drColiSprite);
-    pixiApp.stage.addChild(boriSprite);
+    drColiWrap.addChild(drColiSprite);
+    boriWrap.addChild(boriSprite);
+
+    pixiApp.stage.addChild(drColiWrap);
+    pixiApp.stage.addChild(boriWrap);
 
     positionCharacters();
 
     // Start idle
-    playCharacterState(drColiSprite, drIdle, { speed: DEFAULT_ANIM_SPEED, pingpong: true });
-    playCharacterState(boriSprite, boriIdle, { speed: DEFAULT_ANIM_SPEED, pingpong: true });
+    playCharacterState("drColi", drColiSprite, drColiWrap, drIdle, { speed: DEFAULT_ANIM_SPEED, pingpong: true });
+    playCharacterState("bori", boriSprite, boriWrap, boriIdle, { speed: DEFAULT_ANIM_SPEED, pingpong: true });
   }
 
+  // ===== Positioning (matches your red rectangles + mobile scaling) =====
   function positionCharacters() {
-    if (!pixiApp || !drColiSprite || !boriSprite) return;
+    if (!pixiApp || !drColiWrap || !boriWrap) return;
 
     const w = pixiApp.renderer.width;
     const h = pixiApp.renderer.height;
 
-    const scale = clamp(w / 1200, CHAR_SCALE_MIN, CHAR_SCALE_MAX);
-    drColiSprite.scale.set(scale);
-    boriSprite.scale.set(scale);
+    // Scale based on BOTH w and h so mobile shrinks correctly
+    let scale = Math.min(w / 1200, h / 675);
+    scale = clamp(scale, SCALE_MIN, SCALE_MAX);
 
-    // Closer to bottom
-    const margin = clamp(h * GROUND_MARGIN_RATIO, GROUND_MARGIN_MIN, GROUND_MARGIN_MAX);
-    const groundY = h - margin;
+    // Extra shrink on small screens to avoid "giants"
+    if (w < 560) scale *= 0.82;
+    if (w < 420) scale *= 0.78;
 
-    const gap = clamp(w * 0.18, GAP_MIN, GAP_MAX);
+    drColiWrap.scale.set(scale);
+    boriWrap.scale.set(scale);
+
+    const groundY = h - GROUND_MARGIN_PX;
+
+    // Tight gap similar to your red vertical rectangle width
+    const gap = clamp(w * GAP_RATIO, GAP_MIN, GAP_MAX);
     const cx = w * 0.5;
 
-    drColiSprite.x = cx - gap / 2;
-    boriSprite.x = cx + gap / 2;
+    drColiWrap.x = cx - gap / 2;
+    boriWrap.x = cx + gap / 2;
 
-    // Align “feet” on same ground line (with small offsets if needed)
-    drColiSprite.y = groundY + DRCOLI_Y_OFFSET;
-    boriSprite.y = groundY + BORI_Y_OFFSET;
+    // Wrapper origin is the feet point
+    drColiWrap.y = groundY;
+    boriWrap.y = groundY;
   }
 
-  // ===== State setters =====
-  async function setDrColi(state, opts = {}) {
-    charState.drColi = state;
-    await ensureStateLoaded("drColi", state);
-    playCharacterState(drColiSprite, textureCache.drColi[state], { speed: DEFAULT_ANIM_SPEED, pingpong: true, ...opts });
+  // ===== Baseline stabilization for trimmed frames =====
+  // Goal: keep bottom-center of the *original* source canvas pinned at wrapper origin (0,0)
+  function stabilizeToBottomCenter(sprite, wrapper) {
+    const tex = sprite.texture;
+    if (!tex) return;
+
+    const orig = tex.orig || { width: tex.width, height: tex.height };
+    const trim = tex.trim; // may be null
+
+    // Put wrapper pivot at bottom-center of the original source size
+    wrapper.pivot.set(orig.width / 2, orig.height);
+
+    // Then position sprite so trimmed content lands in the correct place inside orig
+    // If trimmed: the trimmed rectangle started at (trim.x, trim.y) inside the orig canvas.
+    // So to place it back into orig coordinates: move sprite to (-trim.x, -trim.y).
+    if (trim) {
+      sprite.position.set(-trim.x, -trim.y);
+    } else {
+      sprite.position.set(0, 0);
+    }
   }
 
-  async function setBori(state, opts = {}) {
-    charState.bori = state;
-    await ensureStateLoaded("bori", state);
-    playCharacterState(boriSprite, textureCache.bori[state], { speed: DEFAULT_ANIM_SPEED, pingpong: true, ...opts });
-  }
-
-  // ===== Smooth ping-pong =====
-  function playCharacterState(sprite, textures, { speed = DEFAULT_ANIM_SPEED, pingpong = true } = {}) {
+  // ===== Animation playback: smooth ping-pong + stabilization =====
+  function playCharacterState(characterKey, sprite, wrapper, textures, { speed = DEFAULT_ANIM_SPEED, pingpong = true } = {}) {
     if (!sprite) return;
 
     if (!textures || textures.length === 0) {
@@ -269,26 +296,46 @@
 
     sprite.textures = textures;
 
+    // Stabilize immediately on the current frame
+    stabilizeToBottomCenter(sprite, wrapper);
+
     if (textures.length === 1) {
       sprite.stop();
       sprite.gotoAndStop(0);
+      stabilizeToBottomCenter(sprite, wrapper);
       return;
     }
 
-    // Smooth pingpong using onFrameChange reversal (no stop/restart)
     const abs = Math.abs(speed || DEFAULT_ANIM_SPEED);
-
-    sprite.loop = true;
     sprite.animationSpeed = abs;
-    sprite._pingpong = !!pingpong;
+    sprite.loop = true;
+
+    sprite._pp = !!pingpong;
+    sprite._ppAbs = abs;
 
     sprite.onFrameChange = (frame) => {
-      if (!sprite._pingpong) return;
-      if (frame === textures.length - 1) sprite.animationSpeed = -abs;
-      else if (frame === 0) sprite.animationSpeed = abs;
+      // 1) Always stabilize per frame (fixes Bori jerks)
+      stabilizeToBottomCenter(sprite, wrapper);
+
+      // 2) Ping-pong smoothly by reversing speed at ends
+      if (!sprite._pp) return;
+      if (frame === sprite.textures.length - 1) sprite.animationSpeed = -sprite._ppAbs;
+      else if (frame === 0) sprite.animationSpeed = sprite._ppAbs;
     };
 
     sprite.play();
+  }
+
+  async function setDrColi(state, opts = {}) {
+    charState.drColi = state;
+    await ensureStateLoaded("drColi", state);
+    playCharacterState("drColi", drColiSprite, drColiWrap, textureCache.drColi[state], { speed: DEFAULT_ANIM_SPEED, pingpong: true, ...opts });
+  }
+
+  async function setBori(state, opts = {}) {
+    charState.bori = state;
+    await ensureStateLoaded("bori", state);
+    playCharacterState("bori", boriSprite, boriWrap, textureCache.bori[state], { speed: DEFAULT_ANIM_SPEED, pingpong: true, ...opts });
   }
 
   // ===== Manifest-driven lazy loading =====
@@ -340,7 +387,7 @@
         return [];
       }
 
-      // Natural numeric sort to reduce jerkiness (e.g. 1,2,3...10 not 1,10,2)
+      // Natural numeric sort (prevents 1,10,2…)
       const keys = Object.keys(sheet.textures).sort(naturalCompare);
       return keys.map(k => sheet.textures[k]);
     } catch (err) {
@@ -360,7 +407,6 @@
 
     setBackground(scene.background || episodeData.background || DEFAULT_BG);
 
-    // Use scene-provided animations for first pose, but Bori policy may override during speech.
     const drAnim = scene.drColi?.animation || "idle";
     const boriAnim = scene.bori?.animation || "idle";
 
@@ -396,7 +442,6 @@
 
   // ===== Bori “listening” policy =====
   async function setBoriDuringSpeech() {
-    // Only do this if we are not in interaction waiting mode
     if (interactionActive) {
       await setBori("idle").catch(() => {});
       return;
@@ -412,17 +457,20 @@
 
     const reroll = async () => {
       if (interactionActive) return;
-      // 10% look during downtime, otherwise idle
+
       if (Math.random() < BORIS_LOOK_DURING_DOWNTIME) {
         await setBori("look").catch(() => {});
       } else {
         await setBori("idle").catch(() => {});
       }
-      const next = BORIS_DOWNTIME_REROLL_MS_MIN + Math.random() * (BORIS_DOWNTIME_REROLL_MS_MAX - BORIS_DOWNTIME_REROLL_MS_MIN);
+
+      const next = BORIS_DOWNTIME_REROLL_MS_MIN +
+        Math.random() * (BORIS_DOWNTIME_REROLL_MS_MAX - BORIS_DOWNTIME_REROLL_MS_MIN);
+
       boriDowntimeTimer = setTimeout(reroll, next);
     };
 
-    const first = 600 + Math.random() * 800;
+    const first = 650 + Math.random() * 850;
     boriDowntimeTimer = setTimeout(reroll, first);
   }
 
@@ -444,13 +492,12 @@
       dialogueTextEl.textContent = msg;
 
       await setDrColi("talk").catch(() => {});
-      await setBoriDuringSpeech(); // <-- main “Bori mostly idle while speech” behavior
+      await setBoriDuringSpeech();
 
       await speakLine(msg);
       await sleep(BETWEEN_LINES_MS);
     }
 
-    // After speech ends: return to idle + start downtime behavior (if not interacting)
     await setDrColi("idle").catch(() => {});
     if (!interactionActive) {
       await setBori("idle").catch(() => {});
@@ -587,7 +634,7 @@
     interactionActive = (type === "mic" || type === "emoji");
     stopBoriDowntime();
 
-    // While waiting for interaction: both idle
+    // While waiting: both idle
     if (interactionActive) {
       setDrColi("idle").catch(() => {});
       setBori("idle").catch(() => {});
@@ -646,15 +693,13 @@
     micButtonEl.classList.remove("listening");
     micButtonEl.classList.remove("attention");
 
-    // Speak prompt, then glow mic
     micButtonEl.disabled = true;
     drColiSay(prompt).finally(() => {
-      // after prompt ends: both idle (waiting)
       setDrColi("idle").catch(() => {});
       setBori("idle").catch(() => {});
 
       micButtonEl.disabled = false;
-      micButtonEl.classList.add("attention"); // <-- glow hook (CSS later)
+      micButtonEl.classList.add("attention");
     });
 
     micButtonEl.onclick = async () => {
@@ -676,7 +721,6 @@
         playScene(currentSceneIndex + 1);
       } else {
         await drColiSay(interaction.onFailSay?.[0] || "So close! Let’s try together one more time.");
-        // stay waiting; glow again
         micButtonEl.classList.add("attention");
         setDrColi("idle").catch(() => {});
         setBori("idle").catch(() => {});
@@ -804,7 +848,7 @@
     return dist <= maxEdits;
   }
 
-  // ===== Celebration =====
+  // ===== Celebration (slower + varied confetti) =====
   async function celebrateCorrect(praiseLine) {
     const prevDr = charState.drColi;
     const prevBori = charState.bori;
@@ -812,46 +856,61 @@
     setDrColi("wave", { speed: 0.25 }).catch(() => {});
     setBori("wave", { speed: 0.25 }).catch(() => {});
 
-    spawnImageConfetti();
+    spawnImageConfettiCool();
     await drColiSay(praiseLine);
 
     setDrColi(prevDr || "idle").catch(() => {});
     setBori(prevBori || "idle").catch(() => {});
   }
 
-  function spawnImageConfetti() {
-    const N = 45;
-    const w = fxLayerEl.clientWidth || window.innerWidth;
-    const h = fxLayerEl.clientHeight || window.innerHeight;
+  function spawnImageConfettiCool() {
+    // Two waves for a more “celebration” feel
+    spawnWave(32, 0);
+    spawnWave(26, 220);
 
-    for (let i = 0; i < N; i++) {
-      const img = document.createElement("img");
-      img.src = CONFETTI_IMAGES[(Math.random() * CONFETTI_IMAGES.length) | 0];
-      img.alt = "";
-      img.style.position = "absolute";
-      img.style.left = Math.random() * w + "px";
-      img.style.top = (-40 - Math.random() * 60) + "px";
-      img.style.width = (18 + Math.random() * 12) + "px"; // ~20% of 120px
-      img.style.height = "auto";
-      img.style.opacity = "0.95";
-      img.style.zIndex = "100";
-      img.style.pointerEvents = "none";
-      fxLayerEl.appendChild(img);
+    function spawnWave(count, delayMs) {
+      const w = fxLayerEl.clientWidth || window.innerWidth;
+      const h = fxLayerEl.clientHeight || window.innerHeight;
 
-      const drift = (Math.random() - 0.5) * 280;
-      const dur = 1200 + Math.random() * 900;
-      const rot0 = Math.random() * 360;
-      const rot1 = rot0 + (Math.random() * 720 + 360);
+      for (let i = 0; i < count; i++) {
+        const img = document.createElement("img");
+        img.src = CONFETTI_IMAGES[(Math.random() * CONFETTI_IMAGES.length) | 0];
+        img.alt = "";
+        img.style.position = "absolute";
+        img.style.left = (Math.random() * w) + "px";
+        img.style.top = (-60 - Math.random() * 120) + "px";
 
-      img.animate(
-        [
-          { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: 1 },
-          { transform: `translate(${drift}px, ${h + 80}px) rotate(${rot1}deg)`, opacity: 0.98 }
-        ],
-        { duration: dur, easing: "cubic-bezier(.2,.6,.2,1)", fill: "forwards" }
-      );
+        // size ~20% of 120px, but with some variety
+        const size = 16 + Math.random() * 16; // 16–32px
+        img.style.width = size + "px";
+        img.style.height = "auto";
+        img.style.opacity = "0.98";
+        img.style.zIndex = "100";
+        img.style.pointerEvents = "none";
+        fxLayerEl.appendChild(img);
 
-      setTimeout(() => img.remove(), dur + 200);
+        const drift = (Math.random() - 0.5) * 320; // sideways drift
+        const sway = (Math.random() - 0.5) * 140;  // mid-sway
+        const dur = 1800 + Math.random() * 2600;   // 1.8s–4.4s (slower + varied)
+        const rot0 = Math.random() * 360;
+        const rot1 = rot0 + (Math.random() * 420 + 240);
+        const rot2 = rot1 + (Math.random() * 420 + 240);
+
+        const startDelay = delayMs + Math.random() * 180; // slightly stagger pieces
+
+        setTimeout(() => {
+          img.animate(
+            [
+              { transform: `translate(0px, 0px) rotate(${rot0}deg)`, opacity: 1 },
+              { transform: `translate(${drift * 0.35 + sway}px, ${(h + 80) * 0.45}px) rotate(${rot1}deg)`, opacity: 1 },
+              { transform: `translate(${drift}px, ${h + 120}px) rotate(${rot2}deg)`, opacity: 0.99 }
+            ],
+            { duration: dur, easing: "cubic-bezier(.18,.7,.2,1)", fill: "forwards" }
+          );
+
+          setTimeout(() => img.remove(), dur + 220);
+        }, startDelay);
+      }
     }
   }
 })();
