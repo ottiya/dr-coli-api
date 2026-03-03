@@ -192,7 +192,16 @@ body {
 .mic.listening img {
   animation: micPulse 0.9s infinite ease-in-out;
 }
+/* Change the mic's visuals when we are processing the audio that the kids said */
+.mic.processing img {
+  animation: micGlow 1.6s infinite ease-in-out;
+}
 
+@keyframes micGlow {
+  0%   { transform: scale(1); opacity: 0.9; }
+  50%  { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
 /* ====== FX layer (confetti) ====== */
 .fx-layer {
   position: absolute;
