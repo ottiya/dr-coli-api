@@ -489,6 +489,8 @@
     // reset UI
     emojiTrayEl.classList.add("hidden");
     micButtonEl.classList.add("hidden");
+    micButtonEl.classList.remove("listening");
+    micButtonEl.classList.remove("attention");
     micButtonEl.onclick = null;
 
     if (type === "none") return autoAdvance();
@@ -527,51 +529,106 @@
     });
   }
 
+  // ===== Mic interaction (RESTORED: targets[] + strictness + pulse/glow + no empty auto-success) =====
   function showMicInteraction(interaction) {
-    const target = (interaction.target || interaction.phrase || interaction.expected || "").trim();
+    // Support both: interaction.targets (array) and interaction.target (string)
+    const targets = Array.isArray(interaction?.targets)
+      ? interaction.targets.map(t => String(t || "").trim()).filter(Boolean)
+      : [String(interaction?.target || interaction?.phrase || interaction?.expected || "").trim()].filter(Boolean);
+
+    const strictness = interaction?.strictness || "easy";
 
     const prompt =
-      interaction.prompt ||
-      (target ? `Tap the mic, then say: ${target}` : "Tap the mic, then speak!");
+      interaction?.prompt ||
+      (targets[0] ? `Tap the mic, then say ${targets[0]}!` : "Tap the mic, then speak!");
 
+    // Show mic + glow (if CSS defines .attention)
     micButtonEl.classList.remove("hidden");
+    micButtonEl.classList.remove("listening");
+    micButtonEl.classList.add("attention");
+    micButtonEl.disabled = true;
 
-    // Show prompt in bubble (optional)
+    // Show prompt in bubble and speak it with Dr. Coli voice
     dialogueEl.classList.add("active");
     dialogueTextEl.textContent = prompt;
 
-    // subtle “pop” when the mic appears / glows
+    // Subtle UI “pop” when mic becomes actionable
     playSfx(micPopSfx);
+
+    // Speak prompt (with ducking) and show Dr. Coli talking animation
+    (async () => {
+      try {
+        await setDrColi("talk").catch(() => {});
+        await speakLine(prompt);
+      } finally {
+        await setDrColi("idle").catch(() => {});
+        await setBori("idle").catch(() => {});
+        micButtonEl.disabled = false;
+        micButtonEl.classList.add("attention");
+      }
+    })();
 
     micButtonEl.onclick = async () => {
       await waitForUserInteraction();
 
-      // visual feedback
-      setDrColi("talk").catch(() => {});
-      setBori("look").catch(() => {});
+      // Start listening UI (CSS pulse uses .mic.listening img)
+      micButtonEl.classList.remove("attention");
+      micButtonEl.classList.add("listening");
+      micButtonEl.disabled = true;
 
-      const ok = await listenAndCheckPhrase(target);
+      // While listening, keep both characters idle
+      setDrColi("idle").catch(() => {});
+      setBori("idle").catch(() => {});
 
-      if (ok) {
-        await celebrateCorrect(interaction.onSuccessSay?.[0] || interaction.onCorrectSay?.[0] || "Yes!! Amazing job!");
+      const result = await listenAndCheckPhrase(targets, strictness);
+
+      micButtonEl.classList.remove("listening");
+      micButtonEl.disabled = false;
+
+      if (result.ok) {
+        await celebrateCorrect(interaction?.onSuccessSay?.[0] || "Yes!! Amazing job!");
         micButtonEl.classList.add("hidden");
         playScene(currentSceneIndex + 1);
       } else {
-        await speakLine(interaction.onFailSay?.[0] || interaction.onWrongSay?.[0] || "Let’s try again!");
-        // keep mic visible so they can retry
+        // Encourage retry (spoken by Dr. Coli)
+        const failLine = interaction?.onFailSay?.[0] || "So close! Let’s try together one more time.";
+        dialogueEl.classList.add("active");
+        dialogueTextEl.textContent = failLine;
+        await setDrColi("talk").catch(() => {});
+        await speakLine(failLine);
+        await setDrColi("idle").catch(() => {});
+
+        // Bring back glow so user knows to tap again
+        micButtonEl.classList.add("attention");
       }
     };
   }
 
-  async function listenAndCheckPhrase(target) {
+  async function listenAndCheckPhrase(targets, strictness) {
     try {
+      const list = Array.isArray(targets)
+        ? targets.map(t => String(t || "").trim()).filter(Boolean)
+        : [String(targets || "").trim()].filter(Boolean);
+
       const blob = await recordOnce({ ms: RECORD_MS });
       const transcript = await sttViaOpenAI(blob);
-      const ok = kidForgivingMatchAdvanced(transcript, target);
-      return ok;
+
+      // IMPORTANT: never auto-succeed on empty transcript
+      const cleaned = normalizeKo(transcript);
+      if (!cleaned) return { ok: false, transcript: transcript || "" };
+
+      // If no targets provided, accept any speech
+      if (!list.length) return { ok: true, transcript };
+
+      for (const t of list) {
+        if (kidForgivingMatchAdvanced(transcript, t, strictness)) {
+          return { ok: true, transcript };
+        }
+      }
+      return { ok: false, transcript };
     } catch (e) {
       console.warn("STT mic flow failed:", e);
-      return false;
+      return { ok: false, transcript: "" };
     }
   }
 
@@ -645,15 +702,17 @@
     return dp[a.length][b.length];
   }
 
-  function kidForgivingMatchAdvanced(spoken, target) {
+  function kidForgivingMatchAdvanced(spoken, target, strictness = "easy") {
     const s0 = normalizeKo(spoken);
     const t0 = normalizeKo(target);
     if (!s0 || !t0) return false;
     if (s0 === t0) return true;
 
+    // Lightly ignore common kid endings
     const s = s0.replace(/(요|이요|으)$/g, "");
     const t = t0.replace(/(요|이요|으)$/g, "");
 
+    // Fast contains checks (very forgiving)
     if (s.includes(t) || t.includes(s)) return true;
 
     const sj = toJamo(s);
@@ -661,8 +720,14 @@
     const dist = levenshtein(sj, tj);
     const L = Math.max(sj.length, tj.length);
 
-    // Forgiving threshold based on length
-    const maxEdits = L <= 6 ? 1 : L <= 12 ? 2 : 3;
+    // Strictness knobs
+    // - strict: nearly exact
+    // - normal: default
+    // - easy: forgiving for kids (e.g., 안녕하세이요)
+    let maxEdits;
+    if (strictness === "strict") maxEdits = L <= 10 ? 1 : 2;
+    else if (strictness === "normal") maxEdits = L <= 6 ? 1 : L <= 12 ? 2 : 3;
+    else maxEdits = L <= 6 ? 2 : L <= 12 ? 3 : 4;
 
     return dist <= maxEdits;
   }
