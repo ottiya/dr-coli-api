@@ -171,6 +171,28 @@ body {
   100% { transform: scale(1); opacity: 1; }
 }
 
+/* ====== Mic glow (after prompt) ====== */
+.mic.attention {
+  /* a soft glow ring + gentle breathing */
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.55))
+          drop-shadow(0 0 18px rgba(180, 90, 255, 0.55));
+}
+
+.mic.attention img {
+  animation: micGlow 1.25s ease-in-out infinite;
+}
+
+@keyframes micGlow {
+  0%   { transform: scale(1);   opacity: 1; }
+  50%  { transform: scale(1.06); opacity: 0.95; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+/* If it's listening, keep your pulse as the priority */
+.mic.listening img {
+  animation: micPulse 0.9s infinite ease-in-out;
+}
+
 /* ====== FX layer (confetti) ====== */
 .fx-layer {
   position: absolute;
