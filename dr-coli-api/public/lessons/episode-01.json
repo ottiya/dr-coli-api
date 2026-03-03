@@ -16,6 +16,7 @@
       "bori": { "animation": "look" },
       "interaction": { "type": "none" }
     },
+
     {
       "id": "s1-teach-seonsaengnim",
       "drColi": {
@@ -29,12 +30,18 @@
       "bori": { "animation": "look" },
       "interaction": {
         "type": "mic",
-        "target": "선생님",
+        "targets": [
+          "선생님",
+          "선생님이에요",
+          "선생님 입니다"
+        ],
         "prompt": "Tap the mic, then say 선생님!",
+        "strictness": "easy",
         "onSuccessSay": ["Yes!! Amazing job!"],
         "onFailSay": ["So close! Let’s try together one more time."]
       }
     },
+
     {
       "id": "s2-meet-bori",
       "drColi": {
@@ -48,6 +55,7 @@
       "bori": { "animation": "wave" },
       "interaction": { "type": "none" }
     },
+
     {
       "id": "s3-intro-annyonghaseyo",
       "drColi": {
@@ -61,6 +69,7 @@
       "bori": { "animation": "bow" },
       "interaction": { "type": "none" }
     },
+
     {
       "id": "s4-repeat-annyonghaseyo",
       "drColi": {
@@ -73,12 +82,18 @@
       "bori": { "animation": "bow" },
       "interaction": {
         "type": "mic",
-        "target": "안녕하세요",
+        "targets": [
+          "안녕하세요",
+          "안녕하세이요",
+          "안녕하세요 선생님"
+        ],
         "prompt": "Tap the mic, then say 안녕하세요!",
+        "strictness": "easy",
         "onSuccessSay": ["Yes!! Amazing job!"],
         "onFailSay": ["So close! Let’s try together one more time."]
       }
     },
+
     {
       "id": "s5-emoji-check-annyonghaseyo",
       "drColi": {
@@ -97,6 +112,7 @@
         "onWrongSay": ["Nice try! Let’s try again. How do we say 안녕하세요?"]
       }
     },
+
     {
       "id": "s6-intro-annyong",
       "drColi": {
