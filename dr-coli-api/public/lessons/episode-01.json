@@ -180,7 +180,7 @@
         "animation": "bow",
         "say": [
           "This is the big moment.",
-          "Ready to help Bori say hello to 선생님?",
+          "Ready to help Bori say hello to 선생님?"
         ]
       },
       "bori": { "animation": "bow" },
