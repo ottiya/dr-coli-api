@@ -457,3 +457,91 @@ body {
 .start-btn:hover{
   transform:translateY(-2px);
 }
+
+
+/* =========================
+   MOBILE FRIENDLY START SCREEN (PATCH)
+   - Keeps the card usable on phones
+   - Prevents keyboard from hiding Start button
+   - Makes theme tiles bigger + responsive
+========================= */
+
+/* Safe-area + breathing room */
+.start-overlay{
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+           max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  box-sizing: border-box;
+}
+
+/* Card fits on short screens and can scroll internally */
+.start-card{
+  max-height: min(86vh, 720px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(22px + env(safe-area-inset-bottom));
+}
+
+/* Make the Start button easier to reach even when scrolling */
+.start-btn{
+  position: sticky;
+  bottom: 0;
+}
+
+/* Prevent iOS Safari zooming into the input */
+.name-input input{
+  font-size: 16px;
+}
+
+/* Medium phones: 2 columns for theme tiles */
+@media (max-width: 560px){
+  .start-card{
+    width: min(520px, 96%);
+    padding: 22px 18px 22px;
+    border-radius: 22px;
+  }
+
+  .start-header h2{
+    font-size: 20px;
+  }
+
+  .start-instructions{
+    margin-bottom: 14px;
+  }
+
+  .theme-grid{
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .theme-tile{
+    padding: 14px 10px 12px;
+    border-radius: 16px;
+    min-height: 86px; /* bigger tap area */
+  }
+
+  .theme-emoji{
+    font-size: 34px;
+  }
+
+  .theme-label{
+    font-size: 14px;
+  }
+
+  .start-btn{
+    font-size: 18px;
+    padding: 14px;
+    border-radius: 16px;
+  }
+}
+
+/* Small phones: 1 column (big, comfy buttons) */
+@media (max-width: 380px){
+  .theme-grid{
+    grid-template-columns: 1fr;
+  }
+
+  .theme-tile{
+    min-height: 78px;
+  }
+}
