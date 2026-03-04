@@ -533,7 +533,8 @@
 
     currentSceneId = scene.id || String(index);
 
-    setBackground(scene.background || episodeData.background || DEFAULT_BG);
+    const themeBg = THEME_BG[selectedTheme] || DEFAULT_BG;
+setBackground(scene.background || themeBg);
 
     setDrColi(scene.drColi?.animation || "idle").catch(() => {});
     setBori(scene.bori?.animation || "idle").catch(() => {});
