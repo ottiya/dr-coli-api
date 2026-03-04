@@ -266,6 +266,7 @@ let missionTextTimer = null;
       el.classList.remove("pop");
     }, 260);
   }
+}
 
   // ⭐ Show temporary "Star earned!" message
   if (missionTextEl) {
