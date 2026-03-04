@@ -118,7 +118,7 @@
 
     // Mission bar
     missionBarEl = document.getElementById("missionBar");
-    missionTextEl = document.getElementById(\"missionText\");
+    missionTextEl = document.getElementById("missionText");
     initStarsUI(); // safe even if missionBar isn't present
 
     if (
@@ -242,7 +242,7 @@
   }
 
   
-  function awardStar(sceneId) {
+function awardStar(sceneId) {
     if (!sceneId) return;
     if (starredScenes.has(sceneId)) return;
     if (!starEls.length) initStarsUI();
@@ -256,7 +256,6 @@
 
     if (el) {
       el.textContent = "⭐";
-
       el.classList.remove("pop");
       void el.offsetWidth;
       el.classList.add("pop");
@@ -270,7 +269,6 @@
         missionTextEl.textContent = "⭐⭐⭐⭐⭐ Bori is ready!";
       } else {
         missionTextEl.textContent = `⭐ Star earned! (${starsEarned}/5)`;
-
         missionTextTimer = setTimeout(() => {
           missionTextEl.textContent = "Collect 5 stars to help Bori!";
         }, 1200);
