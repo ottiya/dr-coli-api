@@ -312,6 +312,7 @@ body {
   align-items:center;
   justify-content:center;
   background:rgba(0,0,0,.35);
+  backdrop-filter:blur(6px);
   z-index:50;
 }
 
