@@ -230,7 +230,7 @@ body {
 
   padding: 10px 16px;
   border-radius: 18px;
-  background: #F5EFD4;
+  background: #000000;
   box-shadow: 0 10px 24px rgba(0,0,0,0.16);
   backdrop-filter: blur(6px);
 
@@ -269,7 +269,7 @@ body {
 .mission-text {
   font-size: 18px;
   font-weight: 800;
-  color: #2b2b2b;
+  color: #FFFFFF;
   user-select: none;
   text-align: center;
 }
