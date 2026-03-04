@@ -36,7 +36,7 @@
         "prompt": "Tap the mic, then say 선생님!",
         "strictness": "easy",
         "onSuccessSay": [
-          "Wonderful! Bori is learning!",
+          "Wonderful {name}!",
           "Excellent! That’s one star!"
         ],
         "onFailSay": ["So close! Let’s try together one more time."]
@@ -48,7 +48,7 @@
       "drColi": {
         "animation": "talk",
         "say": [
-          "Bori and I are so happy you’re here!"
+          "Bori and I are so happy you’re here, {name}!"
         ]
       },
       "bori": { "animation": "wave" },
@@ -94,8 +94,8 @@
         "prompt": "Tap the mic, then say 안녕하세요!",
         "strictness": "easy",
         "onSuccessSay": [
-          "Great job!",
-          "Wonderful! That’s another star!"
+          "Great job, {name}!",
+          "That’s another star!"
         ],
         "onFailSay": ["So close! Let’s try together one more time."]
       }
@@ -106,7 +106,7 @@
       "drColi": {
         "animation": "talk",
         "say": [
-          "Help Bori remember!",
+          "{name}, help Bori remember!",
           "When we say 안녕하세요, what do we do?"
         ]
       },
@@ -117,7 +117,7 @@
         "correctIndex": 0,
         "onCorrectSay": [
           "Yes! We bow when we say 안녕하세요!",
-          "Excellent! That’s one more star!"
+          "Excellent, {name}! That’s one more star!"
         ],
         "onWrongSay": ["Nice try! Let’s try again."]
       }
@@ -142,8 +142,7 @@
       "drColi": {
         "animation": "talk",
         "say": [
-          "Help Bori remember!",
-          "When we say 안녕, what do we do?"
+          "{name}, when we say 안녕, what do we do?"
         ]
       },
       "bori": { "animation": "look" },
@@ -152,7 +151,7 @@
         "choices": ["🙇‍♀️", "👋", "🏃‍♀️"],
         "correctIndex": 1,
         "onCorrectSay": [
-          "Yes! We wave when we say 안녕!",
+          "Yes, {name}! We wave when we say 안녕!",
           "Wonderful! Another star!"
         ],
         "onWrongSay": ["Nice try! Let’s try again."]
@@ -191,7 +190,7 @@
         "strictness": "easy",
         "onSuccessSay": [
           "Bori is ready to greet 선생님!",
-          "Wonderful! You earned all the stars!"
+          "Wonderful, {name}! You earned all the stars!"
         ],
         "onFailSay": ["So close! Let’s try together one more time."]
       }
