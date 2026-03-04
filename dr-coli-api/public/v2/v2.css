@@ -324,6 +324,8 @@ body {
   box-shadow:0 18px 40px rgba(0,0,0,.25);
   text-align:center;
   font-family:system-ui, sans-serif;
+
+  box-sizing: border-box;     /* NEW */
 }
 
 .start-header h2{
@@ -406,7 +408,9 @@ body {
 ========================= */
 
 .name-input{
-  margin-bottom:18px;
+  margin: 0 auto 18px;     /* NEW: centers the whole block */
+  width: 100%;             /* keeps it consistent */
+  box-sizing: border-box;  /* NEW */
 }
 
 .name-input label{
@@ -416,11 +420,14 @@ body {
 }
 
 .name-input input{
-  width:100%;
-  padding:10px 12px;
-  border-radius:10px;
-  border:2px solid #eee;
-  font-size:15px;
+  display: block;          /* NEW: removes inline quirks */
+  width: 100%;
+  margin: 0 auto;          /* NEW: centers cleanly */
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #eee;
+  font-size: 15px;
+  box-sizing: border-box;  /* NEW: prevents overflow */
 }
 
 .name-input small{
