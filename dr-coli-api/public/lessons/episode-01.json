@@ -8,7 +8,7 @@
       "drColi": {
         "animation": "talk",
         "say": [
-          "Hello, dear friends! My name is Dr. Coli.",
+          "Hello, {name}! My name is Dr. Coli.",
           "Let's learn Korean together!",
           "You can also call me Coli 선생님."
         ]
