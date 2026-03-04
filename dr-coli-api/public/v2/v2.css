@@ -219,7 +219,7 @@ body {
   position: absolute;
   left: 50%;
   /* Place it just under the dialogue bubble */
-  bottom: 170px;
+  top: 170px;
   transform: translateX(-50%);
   z-index: 31; /* above characters, below FX */
   pointer-events: none;
