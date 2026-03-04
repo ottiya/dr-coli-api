@@ -10,6 +10,15 @@
   const EPISODE_URL = "/lessons/episode-01.json";
   const CHARACTER_MANIFEST_URL = "/assets/characters.manifest.json";
 
+  // Theme mapping (Start Screen)
+  const THEME_BG = {
+    puppies: "/assets/backgrounds/bg-puppies.png",
+    dino: "/assets/backgrounds/bg-dinos.png",
+    airport: "/assets/backgrounds/bg-planes.png",
+  };
+  const STORAGE_THEME_KEY = "drcoli_theme";
+  const STORAGE_NAME_KEY = "drcoli_kidname";
+
   // TTS
   const TTS_RATE = 1.25; // faster speaking
   const BETWEEN_LINES_MS = 80; // less delay between lines
@@ -19,7 +28,7 @@
   const SFX_CORRECT = "/assets/sound-effects/correct-sound-effect.wav";
   const SFX_KIDS_HOORAY = "/assets/sound-effects/kids-hooray.wav";
   const SFX_KIDS_YAY = "/assets/sound-effects/kids-yay.wav";
-  const SFX_MIC_POP = "/assets/sound-effects/kids-giggle.wav"; // subtle “pop” substitute at low volume
+  const SFX_MIC_POP = "/assets/sound-effects/kids-giggle.wav";
 
   // STT
   const STT_MODEL = "gpt-4o-mini-transcribe";
@@ -70,9 +79,17 @@
     fxLayerEl,
     stageLayerEl;
 
+  // Start screen DOM
+  let startScreenEl = null;
+  let startButtonEl = null;
+  let kidNameEl = null;
+  let themeTiles = [];
+  let selectedTheme = "puppies";
+
   // Audio unlock gate
   let userInteracted = false;
   let unlockPromise = null;
+  let resolveUnlock = null;
 
   // ===== SFX / Music objects =====
   let introMusic = null;
@@ -98,7 +115,13 @@
     fxLayerEl = document.getElementById("fxLayer");
     stageLayerEl = document.getElementById("stageLayer");
 
-    // NEW: mission bar
+    // Start screen elements (already in your HTML)
+    startScreenEl = document.getElementById("startScreen");
+    startButtonEl = document.getElementById("startButton");
+    kidNameEl = document.getElementById("kidName");
+    themeTiles = Array.from(document.querySelectorAll(".theme-tile"));
+
+    // Mission bar
     missionBarEl = document.getElementById("missionBar");
     initStarsUI(); // safe even if missionBar isn't present
 
@@ -119,10 +142,103 @@
 
     applyDialogueLayoutFix();
     initSfx();
-    ensureStartOverlay();
+
+    // IMPORTANT: We do NOT show the old “Tap to start” overlay anymore.
+    // The Start button handles audio unlock + intro sequence now.
+    initStartScreen();
 
     boot().catch((err) => console.error("BOOT ERROR:", err));
   });
+
+  // ===== Start Screen =====
+  function initStartScreen() {
+    // Build unlockPromise once; Start button will resolve it.
+    if (!unlockPromise) {
+      unlockPromise = new Promise((resolve) => {
+        resolveUnlock = resolve;
+      });
+    }
+
+    // Hide mission bar until lesson starts (so it doesn't appear over the start card)
+    if (missionBarEl) missionBarEl.style.display = "none";
+
+    // Load last saved values
+    const savedTheme = (localStorage.getItem(STORAGE_THEME_KEY) || "").trim();
+    const savedName = (localStorage.getItem(STORAGE_NAME_KEY) || "").trim();
+
+    if (THEME_BG[savedTheme]) selectedTheme = savedTheme;
+    else selectedTheme = "puppies";
+
+    if (kidNameEl) kidNameEl.value = savedName;
+
+    // Set initial background behind the card
+    setBackground(THEME_BG[selectedTheme] || DEFAULT_BG);
+
+    // Set selected tile UI
+    setSelectedThemeTile(selectedTheme);
+
+    // Wire theme tile clicks
+    themeTiles.forEach((tile) => {
+      tile.addEventListener("click", () => {
+        const theme = tile.getAttribute("data-theme");
+        if (!THEME_BG[theme]) return;
+        selectedTheme = theme;
+
+        setSelectedThemeTile(selectedTheme);
+        setBackground(THEME_BG[selectedTheme]);
+      });
+    });
+
+    // Wire Start button click
+    if (startButtonEl) {
+      startButtonEl.addEventListener("click", async () => {
+        // prevent double-click chaos
+        startButtonEl.disabled = true;
+
+        // Save name + theme (sticky)
+        const name = (kidNameEl?.value || "").trim();
+        localStorage.setItem(STORAGE_THEME_KEY, selectedTheme);
+        localStorage.setItem(STORAGE_NAME_KEY, name);
+
+        // Audio unlock gate
+        userInteracted = true;
+        if (resolveUnlock) resolveUnlock();
+
+        await unlockAudioContext();
+
+        // Intro music: start → hold ~2s → fade out → start lesson
+        try {
+          if (introMusic) {
+            introMusic.currentTime = 0;
+            introMusic.volume = NORMAL_MUSIC_VOL;
+            await introMusic.play();
+          }
+        } catch {
+          // non-fatal
+        }
+
+        await sleep(2000);
+        await fadeOutAudio(introMusic, 900);
+
+        // Hide start screen
+        if (startScreenEl) startScreenEl.style.display = "none";
+
+        // Now allow lesson start
+        introSequenceDone = true;
+
+        // Show mission bar once lesson begins (we tie it to dialogue too)
+        if (missionBarEl) missionBarEl.style.display = "";
+
+        maybeStartEpisode();
+      });
+    }
+  }
+
+  function setSelectedThemeTile(theme) {
+    themeTiles.forEach((t) => t.classList.remove("selected"));
+    const el = themeTiles.find((t) => t.getAttribute("data-theme") === theme);
+    if (el) el.classList.add("selected");
+  }
 
   // ===== Stars helpers =====
   function initStarsUI() {
@@ -163,7 +279,7 @@
   }
 
   async function boot() {
-    setBackground(DEFAULT_BG);
+    // Start screen already set the background. Boot can keep it.
     initPixi();
 
     // Pixi v7 Assets init
@@ -179,15 +295,12 @@
 
     episodeData = ep;
 
-    // Support either:
-    // { drColi: {...}, bori: {...} } OR { "drColi": {...}, "bori": {...} } OR { drColi:... } etc.
     characterManifest = normalizeManifest(man);
 
     // Fast boot: load minimum states only
     await Promise.all([
       ensureStateLoaded("drColi", "idle"),
       ensureStateLoaded("bori", "idle"),
-      // prewarm common ones (optional)
       ensureStateLoaded("drColi", "talk").catch(() => {}),
       ensureStateLoaded("bori", "look").catch(() => {}),
     ]);
@@ -198,15 +311,12 @@
   }
 
   function maybeStartEpisode() {
-    // Start only after assets are ready AND the intro sequence finished.
     if (!assetsReadyToStart) return;
     if (!introSequenceDone) return;
 
-    // Prevent double-start
     if (maybeStartEpisode.__started) return;
     maybeStartEpisode.__started = true;
 
-    // NEW: reset stars at episode start
     resetStars();
     playScene(0);
   }
@@ -269,7 +379,9 @@
     drColiSprite.scale.set(scale);
     boriSprite.scale.set(scale);
 
-    const margin = clamp(h * 0.028, 14, 34);
+    // If you want them LOWER (closer to the tennis ball),
+    // increase this margin a bit smaller:
+    const margin = clamp(h * 0.016, 10, 22);
     const groundY = h - margin;
 
     const gap = clamp(w * 0.18, 140, 360);
@@ -419,7 +531,6 @@
     const scene = episodeData?.scenes?.[index];
     if (!scene) return;
 
-    // NEW: remember current scene id for star awarding
     currentSceneId = scene.id || String(index);
 
     setBackground(scene.background || episodeData.background || DEFAULT_BG);
@@ -457,64 +568,20 @@
 
   function showDialogue() {
     dialogueEl.classList.add("active");
+    // Make mission bar feel “paired” with the dialogue bubble
+    if (missionBarEl) missionBarEl.classList.add("active");
   }
 
   function hideDialogue() {
     dialogueEl.classList.remove("active");
     dialogueTextEl.textContent = "";
+    if (missionBarEl) missionBarEl.classList.remove("active");
   }
 
-  // ===== Audio unlock overlay + intro music sequence =====
+  // ===== Audio unlock + gating =====
+  // Old overlay UI removed; we keep unlock logic and wait for Start button.
   function ensureStartOverlay() {
-    if (document.getElementById("startOverlay")) return;
-
-    const overlay = document.createElement("div");
-    overlay.id = "startOverlay";
-    overlay.style.position = "absolute";
-    overlay.style.inset = "0";
-    overlay.style.display = "grid";
-    overlay.style.placeItems = "center";
-    overlay.style.background = "rgba(0,0,0,0.55)";
-    overlay.style.zIndex = "9999";
-    overlay.style.color = "#fff";
-    overlay.style.fontFamily = "Nunito, system-ui, sans-serif";
-    overlay.style.textAlign = "center";
-    overlay.style.padding = "24px";
-    overlay.innerHTML = `
-      <div style="max-width: 520px;">
-        <div style="font-size: 28px; font-weight: 800; margin-bottom: 10px;">Tap to start</div>
-        <div style="font-size: 16px; opacity: 0.9;">We’ll play a quick intro, then begin.</div>
-      </div>
-    `;
-
-    overlay.addEventListener(
-      "pointerdown",
-      async () => {
-        userInteracted = true;
-        overlay.remove();
-        await unlockAudioContext();
-
-        // Intro music: start → hold ~2s → fade out → start lesson
-        try {
-          if (introMusic) {
-            introMusic.currentTime = 0;
-            introMusic.volume = NORMAL_MUSIC_VOL;
-            await introMusic.play();
-          }
-        } catch {
-          // non-fatal
-        }
-
-        await sleep(2000);
-        await fadeOutAudio(introMusic, 900);
-
-        introSequenceDone = true;
-        maybeStartEpisode();
-      },
-      { once: true }
-    );
-
-    document.body.appendChild(overlay);
+    // no-op (kept so older calls won’t crash)
   }
 
   async function unlockAudioContext() {
@@ -536,19 +603,11 @@
   }
 
   async function waitForUserInteraction() {
+    // After Start button, this is true and audio will play normally.
     if (userInteracted) return;
-    if (!unlockPromise) {
-      ensureStartOverlay();
-      unlockPromise = new Promise((resolve) => {
-        const handler = () => {
-          userInteracted = true;
-          window.removeEventListener("pointerdown", handler);
-          resolve();
-        };
-        window.addEventListener("pointerdown", handler, { once: true });
-      });
-    }
-    await unlockPromise;
+
+    // If something calls speakLine early, wait until Start is pressed.
+    if (unlockPromise) await unlockPromise;
   }
 
   // ===== ElevenLabs TTS + ducking =====
@@ -556,7 +615,6 @@
     try {
       await waitForUserInteraction();
 
-      // Duck intro music so speech stays clear
       duckMusicForSpeech(true);
 
       const res = await fetch("/api/tts-elevenlabs", {
@@ -598,7 +656,6 @@
   function enableInteraction(interaction) {
     const type = interaction?.type || "none";
 
-    // reset UI
     emojiTrayEl.classList.add("hidden");
     micButtonEl.classList.add("hidden");
     micButtonEl.classList.remove("listening");
@@ -635,10 +692,7 @@
       btn.textContent = choices[i] || "";
       btn.onclick = async () => {
         if (i === correctIndex) {
-          // NEW: award star on correct emoji
           awardStar(currentSceneId);
-
-          // NEW: speak 2-line praise if present
           await celebrateCorrect(interaction.onCorrectSay || "Yes!! Amazing job!");
 
           emojiTrayEl.classList.remove("active");
@@ -655,7 +709,7 @@
     });
   }
 
-  // ===== Mic interaction (targets[] + strictness + pulse/glow + no empty auto-success) =====
+  // ===== Mic interaction =====
   function showMicInteraction(interaction) {
     const targets = Array.isArray(interaction?.targets)
       ? interaction.targets.map((t) => String(t || "").trim()).filter(Boolean)
@@ -676,21 +730,17 @@
         ? `Tap the mic, then say ${targets[0]}!`
         : "Tap the mic, then speak!");
 
-    // Show mic + glow
     micButtonEl.classList.remove("hidden");
     micButtonEl.classList.remove("listening");
     micButtonEl.classList.remove("processing");
     micButtonEl.classList.add("attention");
     micButtonEl.disabled = true;
 
-    // Show prompt in bubble and speak it with Dr. Coli voice
     dialogueEl.classList.add("active");
     dialogueTextEl.textContent = prompt;
 
-    // Subtle UI “pop” when mic becomes actionable
     playSfx(micPopSfx);
 
-    // Speak prompt and show Dr. Coli talking animation
     (async () => {
       try {
         await setDrColi("talk").catch(() => {});
@@ -711,7 +761,6 @@
       try {
         await waitForUserInteraction();
 
-        // Start listening UI (CSS pulse uses .mic.listening img)
         micButtonEl.classList.remove("attention");
         micButtonEl.classList.add("listening");
         micButtonEl.classList.remove("processing");
@@ -720,19 +769,15 @@
         setDrColi("idle").catch(() => {});
         setBori("idle").catch(() => {});
 
-        // 🔴 Record + detect speech (no STT cost if silent)
         const { blob, speechStarted } = await recordOnceWithSpeechDetect({
           ms: RECORD_MS,
         });
 
-        // If scene changed while recording, ignore
         if (myRun !== sceneRunId) return;
 
-        // Stop pulse now that recording is done
         micButtonEl.classList.remove("listening");
 
         if (!speechStarted) {
-          // Gentle retry on silence (no STT call)
           const silentLine = "Hmm… I didn’t hear anything. Let’s try again!";
           dialogueEl.classList.add("active");
           dialogueTextEl.textContent = silentLine;
@@ -746,22 +791,16 @@
           return;
         }
 
-        // Start STT/check immediately (overlaps with “One moment!”)
         const checkPromise = listenAndCheckPhrase(targets, strictness, blob);
 
-        // Show processing UI
         micButtonEl.classList.add("processing");
         dialogueEl.classList.add("active");
         dialogueTextEl.textContent = "One moment!";
 
-        // Speak while STT runs
         await setDrColi("talk").catch(() => {});
         const oneMomentPromise = speakLine("One moment!");
-
-        // Keep it visible at least a little
         const minProcessingTime = sleep(350);
 
-        // Wait for STT + minimum UI time + the “One moment!” voice
         const [result] = await Promise.all([
           checkPromise,
           minProcessingTime,
@@ -771,16 +810,12 @@
         await setDrColi("idle").catch(() => {});
         micButtonEl.classList.remove("processing");
 
-        // If scene changed while recording/transcribing, ignore
         if (myRun !== sceneRunId) return;
 
         micButtonEl.disabled = false;
 
         if (result.ok) {
-          // NEW: award star on mic success
           awardStar(currentSceneId);
-
-          // NEW: speak 2-line praise if present
           await celebrateCorrect(interaction?.onSuccessSay || "Yes!! Amazing job!");
 
           if (myRun !== sceneRunId) return;
@@ -814,11 +849,9 @@
       const blob = blobOverride || (await recordOnce({ ms: RECORD_MS }));
       const transcript = await sttViaOpenAI(blob);
 
-      // IMPORTANT: never auto-succeed on empty transcript
       const cleaned = normalizeKo(transcript);
       if (!cleaned) return { ok: false, transcript: transcript || "" };
 
-      // If no targets provided, accept any speech
       if (!list.length) return { ok: true, transcript };
 
       for (const t of list) {
@@ -852,7 +885,6 @@
     });
   }
 
-  // Record audio AND detect whether the kid actually spoke (simple RMS VAD)
   async function recordOnceWithSpeechDetect({
     ms = RECORD_MS,
     minSpeakMs = MIN_SPEECH_MS,
@@ -862,7 +894,6 @@
     const rec = new MediaRecorder(stream);
     const chunks = [];
 
-    // WebAudio analyser for RMS (voice activity)
     const AC = window.AudioContext || window.webkitAudioContext;
     let ctx = null;
     let interval = null;
@@ -1007,7 +1038,6 @@
   }
 
   // ===== Celebration + confetti + SFX stack =====
-  // UPDATED: accept either a string OR an array of lines (2-line praise)
   async function celebrateCorrect(praiseLines) {
     const prevDr = charState.drColi;
     const prevBori = charState.bori;
