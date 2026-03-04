@@ -1,4 +1,4 @@
-/* public/v2/v2.js */
+/* public/v2/js/v2.js */
 /* Pixi v7 + lazy-load sheets + ElevenLabs TTS + OpenAI STT mic check (kid-forgiving) */
 
 (() => {
@@ -19,28 +19,20 @@
   const STORAGE_THEME_KEY = "drcoli_theme";
   const STORAGE_NAME_KEY = "drcoli_kidname";
 
-// ===== Personalization (kid name) =====
-function getKidName() {
-  const raw = (localStorage.getItem(STORAGE_NAME_KEY) || "").trim();
-  return raw || "friend";
-}
+  // ===== Personalization (kid name) =====
+  function getKidName() {
+    const raw = (localStorage.getItem(STORAGE_NAME_KEY) || "").trim();
+    return raw || "friend";
+  }
 
-function personalizeText(text) {
-  const name = getKidName();
-  return String(text ?? "").replaceAll("{name}", name);
-}
-
+  function personalizeText(text) {
+    const name = getKidName();
+    return String(text ?? "").replaceAll("{name}", name);
+  }
 
   // TTS
   const TTS_RATE = 1.25; // faster speaking
   const BETWEEN_LINES_MS = 80; // less delay between lines
-
-  // ===== Sound Effects (public/assets/sound-effects) =====
-  const SFX_INTRO = "/assets/sound-effects/ottiya-korean-intro-song.wav";
-  const SFX_CORRECT = "/assets/sound-effects/correct-sound-effect.wav";
-  const SFX_KIDS_HOORAY = "/assets/sound-effects/kids-hooray.wav";
-  const SFX_KIDS_YAY = "/assets/sound-effects/kids-yay.wav";
-  const SFX_MIC_POP = "/assets/sound-effects/kids-giggle.wav";
 
   // STT
   const STT_MODEL = "gpt-4o-mini-transcribe";
@@ -98,25 +90,14 @@ function personalizeText(text) {
   let themeTiles = [];
   let selectedTheme = "puppies";
 
-  // Audio unlock gate
+  // Audio gate (we still keep this in v2.js)
   let userInteracted = false;
   let unlockPromise = null;
   let resolveUnlock = null;
 
-  // ===== SFX / Music objects =====
-  let introMusic = null;
-  let correctSfx = null;
-  let kidsHooraySfx = null;
-  let kidsYaySfx = null;
-  let micPopSfx = null;
-
   // Music start gating
   let assetsReadyToStart = false;
   let introSequenceDone = false;
-
-  // Volume ducking
-  const DUCKED_MUSIC_VOL = 0.22;
-  const NORMAL_MUSIC_VOL = 0.6;
 
   document.addEventListener("DOMContentLoaded", () => {
     bgLayer = document.getElementById("bgLayer");
@@ -153,10 +134,11 @@ function personalizeText(text) {
     }
 
     applyDialogueLayoutFix();
-    initSfx();
 
-    // IMPORTANT: We do NOT show the old “Tap to start” overlay anymore.
-    // The Start button handles audio unlock + intro sequence now.
+    // Init audio module
+    window.DrColiAudio?.init?.({ normalVol: 0.6, duckedVol: 0.22 });
+
+    // Start button handles audio unlock + intro sequence
     initStartScreen();
 
     boot().catch((err) => console.error("BOOT ERROR:", err));
@@ -171,7 +153,7 @@ function personalizeText(text) {
       });
     }
 
-    // Hide mission bar until lesson starts (so it doesn't appear over the start card)
+    // Hide mission bar until lesson starts
     if (missionBarEl) missionBarEl.style.display = "none";
 
     // Load last saved values
@@ -204,7 +186,6 @@ function personalizeText(text) {
     // Wire Start button click
     if (startButtonEl) {
       startButtonEl.addEventListener("click", async () => {
-        // prevent double-click chaos
         startButtonEl.disabled = true;
 
         // Save name + theme (sticky)
@@ -212,25 +193,14 @@ function personalizeText(text) {
         localStorage.setItem(STORAGE_THEME_KEY, selectedTheme);
         localStorage.setItem(STORAGE_NAME_KEY, name);
 
-        // Audio unlock gate
+        // Audio gate: allow TTS and SFX
         userInteracted = true;
         if (resolveUnlock) resolveUnlock();
 
-        await unlockAudioContext();
+        await window.DrColiAudio?.unlockAudioContext?.();
 
-        // Intro music: start → hold ~2s → fade out → start lesson
-        try {
-          if (introMusic) {
-            introMusic.currentTime = 0;
-            introMusic.volume = NORMAL_MUSIC_VOL;
-            await introMusic.play();
-          }
-        } catch {
-          // non-fatal
-        }
-
-        await sleep(2000);
-        await fadeOutAudio(introMusic, 900);
+        // Intro music sequence
+        await window.DrColiAudio?.playIntroSequence?.({ holdMs: 2000, fadeMs: 900 });
 
         // Hide start screen
         if (startScreenEl) startScreenEl.style.display = "none";
@@ -238,7 +208,7 @@ function personalizeText(text) {
         // Now allow lesson start
         introSequenceDone = true;
 
-        // Show mission bar once lesson begins (we tie it to dialogue too)
+        // Show mission bar once lesson begins
         if (missionBarEl) missionBarEl.style.display = "";
 
         maybeStartEpisode();
@@ -283,33 +253,27 @@ function personalizeText(text) {
     if (!el) return;
     el.textContent = "⭐";
 
-    // pop animation (CSS handles it)
     el.classList.remove("pop");
-    void el.offsetWidth; // force reflow so animation can replay
+    void el.offsetWidth;
     el.classList.add("pop");
     setTimeout(() => el.classList.remove("pop"), 260);
   }
 
   async function boot() {
-    // Start screen already set the background. Boot can keep it.
     initPixi();
 
-    // Pixi v7 Assets init
     if (PIXI.Assets?.init) {
       await PIXI.Assets.init({ manifest: null }).catch(() => {});
     }
 
-    // Load episode + manifest in parallel
     const [ep, man] = await Promise.all([
       fetchJSON(EPISODE_URL),
       fetchJSON(CHARACTER_MANIFEST_URL),
     ]);
 
     episodeData = ep;
-
     characterManifest = normalizeManifest(man);
 
-    // Fast boot: load minimum states only
     await Promise.all([
       ensureStateLoaded("drColi", "idle"),
       ensureStateLoaded("bori", "idle"),
@@ -391,8 +355,6 @@ function personalizeText(text) {
     drColiSprite.scale.set(scale);
     boriSprite.scale.set(scale);
 
-    // If you want them LOWER (closer to the tennis ball),
-    // increase this margin a bit smaller:
     const margin = clamp(h * 0.016, 10, 22);
     const groundY = h - margin;
 
@@ -546,7 +508,7 @@ function personalizeText(text) {
     currentSceneId = scene.id || String(index);
 
     const themeBg = THEME_BG[selectedTheme] || DEFAULT_BG;
-setBackground(scene.background || themeBg);
+    setBackground(scene.background || themeBg);
 
     setDrColi(scene.drColi?.animation || "idle").catch(() => {});
     setBori(scene.bori?.animation || "idle").catch(() => {});
@@ -555,6 +517,17 @@ setBackground(scene.background || themeBg);
     playDialogue(lines, () =>
       enableInteraction(scene.interaction || { type: "none" })
     );
+  }
+
+  async function waitForUserInteraction() {
+    if (userInteracted) return;
+    if (unlockPromise) await unlockPromise;
+  }
+
+  async function speakLine(text) {
+    await waitForUserInteraction();
+    const msg = personalizeText(text);
+    await window.DrColiAudio?.speakElevenLabs?.(msg, { rate: TTS_RATE });
   }
 
   async function playDialogue(lines, done) {
@@ -581,7 +554,6 @@ setBackground(scene.background || themeBg);
 
   function showDialogue() {
     dialogueEl.classList.add("active");
-    // Make mission bar feel “paired” with the dialogue bubble
     if (missionBarEl) missionBarEl.classList.add("active");
   }
 
@@ -591,87 +563,10 @@ setBackground(scene.background || themeBg);
     if (missionBarEl) missionBarEl.classList.remove("active");
   }
 
-function setDialogueText(text) {
-  const msg = personalizeText(text);
-  dialogueTextEl.textContent = msg;
-  return msg;
-}
-
-
-  // ===== Audio unlock + gating =====
-  // Old overlay UI removed; we keep unlock logic and wait for Start button.
-  function ensureStartOverlay() {
-    // no-op (kept so older calls won’t crash)
-  }
-
-  async function unlockAudioContext() {
-    try {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
-      const ctx = new AC();
-      await ctx.resume();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      gain.gain.value = 0;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.01);
-    } catch {
-      // non-fatal
-    }
-  }
-
-  async function waitForUserInteraction() {
-    // After Start button, this is true and audio will play normally.
-    if (userInteracted) return;
-
-    // If something calls speakLine early, wait until Start is pressed.
-    if (unlockPromise) await unlockPromise;
-  }
-
-  // ===== ElevenLabs TTS + ducking =====
-  async function speakLine(text) {
-    try {
-      await waitForUserInteraction();
-
-      duckMusicForSpeech(true);
-
-      text = personalizeText(text);
-
-      const res = await fetch("/api/tts-elevenlabs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!res.ok) {
-        console.warn("ElevenLabs TTS error:", res.status);
-        duckMusicForSpeech(false);
-        return;
-      }
-
-      const data = await res.json();
-      const url = data?.url;
-      if (!url) {
-        duckMusicForSpeech(false);
-        return;
-      }
-
-      const audio = new Audio(url);
-      audio.playbackRate = TTS_RATE;
-
-      await audio.play();
-      await new Promise((resolve) => {
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
-      });
-
-      duckMusicForSpeech(false);
-    } catch (err) {
-      duckMusicForSpeech(false);
-      console.warn("TTS playback failed (non-fatal):", err);
-    }
+  function setDialogueText(text) {
+    const msg = personalizeText(text);
+    dialogueTextEl.textContent = msg;
+    return msg;
   }
 
   // ===== Interaction handling =====
@@ -765,7 +660,7 @@ function setDialogueText(text) {
     dialogueEl.classList.add("active");
     dialogueTextEl.textContent = promptText;
 
-    playSfx(micPopSfx);
+    window.DrColiAudio?.playSfx?.("mic");
 
     (async () => {
       try {
@@ -1071,12 +966,8 @@ function setDialogueText(text) {
     await setDrColi("wave").catch(() => {});
     await setBori("wave").catch(() => {});
 
-    playSfx(correctSfx);
-
-    setTimeout(() => {
-      const pick = Math.random() < 0.5 ? kidsHooraySfx : kidsYaySfx;
-      playSfx(pick);
-    }, 150);
+    window.DrColiAudio?.playSfx?.("correct");
+    setTimeout(() => window.DrColiAudio?.playSfx?.("kids"), 150);
 
     spawnFullScreenConfetti();
 
@@ -1162,69 +1053,6 @@ function setDialogueText(text) {
     dialogueTextEl.style.top = "22px";
     dialogueTextEl.style.left = "52px";
     dialogueTextEl.style.right = "52px";
-  }
-
-  function initSfx() {
-    introMusic = new Audio(SFX_INTRO);
-    introMusic.loop = true;
-    introMusic.volume = NORMAL_MUSIC_VOL;
-
-    correctSfx = new Audio(SFX_CORRECT);
-    correctSfx.volume = 0.85;
-
-    kidsHooraySfx = new Audio(SFX_KIDS_HOORAY);
-    kidsHooraySfx.volume = 0.55;
-
-    kidsYaySfx = new Audio(SFX_KIDS_YAY);
-    kidsYaySfx.volume = 0.55;
-
-    micPopSfx = new Audio(SFX_MIC_POP);
-    micPopSfx.volume = 0.18;
-  }
-
-  function playSfx(aud) {
-    if (!aud) return;
-    try {
-      aud.currentTime = 0;
-      aud.play().catch(() => {});
-    } catch {}
-  }
-
-  function fadeOutAudio(aud, ms = 900) {
-    return new Promise((resolve) => {
-      if (!aud) return resolve();
-      const startVol = aud.volume ?? 0;
-      const steps = 15;
-      let i = 0;
-      const iv = setInterval(() => {
-        i++;
-        const t = i / steps;
-        aud.volume = Math.max(0, startVol * (1 - t));
-        if (i >= steps) {
-          clearInterval(iv);
-          try {
-            aud.pause();
-            aud.currentTime = 0;
-          } catch {}
-          aud.volume = startVol;
-          resolve();
-        }
-      }, Math.max(16, Math.floor(ms / steps)));
-    });
-  }
-
-  function duckMusicForSpeech(isDucked) {
-    if (!introMusic) return;
-    const target = isDucked ? DUCKED_MUSIC_VOL : NORMAL_MUSIC_VOL;
-    const steps = 8;
-    const start = introMusic.volume ?? NORMAL_MUSIC_VOL;
-    let i = 0;
-    const iv = setInterval(() => {
-      i++;
-      const t = i / steps;
-      introMusic.volume = start + (target - start) * t;
-      if (i >= steps) clearInterval(iv);
-    }, 35);
   }
 
   function sleep(ms) {
