@@ -261,6 +261,9 @@ body {
   font-size: 30px;
   line-height: 1;
   user-select: none;
+
+  color: #f5c542;          /* gold star color */
+  text-shadow: 0 2px 3px rgba(0,0,0,0.25);
 }
 
 .mission-text {
