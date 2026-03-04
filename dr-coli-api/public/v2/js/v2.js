@@ -344,15 +344,73 @@ function awardStar(sceneId) {
     return out.drColi || out.bori ? out : man;
   }
 
-  function initPixi() {
-    pixiApp = new PIXI.Application({
-      backgroundAlpha: 0,
-      resizeTo: stageLayerEl,
-      antialias: true,
-    });
-    stageLayerEl.appendChild(pixiApp.view);
-    window.addEventListener("resize", positionCharacters);
+function initPixi() {
+  pixiApp = new PIXI.Application({
+    backgroundAlpha: 0,
+    resizeTo: stageLayerEl,
+    antialias: true,
+  });
+
+  stageLayerEl.appendChild(pixiApp.view);
+
+  // iOS Safari: make sure the canvas actually fills the stage container
+  try {
+    pixiApp.view.style.width = "100%";
+    pixiApp.view.style.height = "100%";
+    pixiApp.view.style.display = "block";
+  } catch {}
+
+  const doResize = () => {
+    try {
+      if (!pixiApp || !stageLayerEl) return;
+
+      const rect = stageLayerEl.getBoundingClientRect();
+      const w = Math.max(1, Math.round(rect.width));
+      const h = Math.max(1, Math.round(rect.height));
+
+      // Even though resizeTo is set, iOS Safari sometimes needs an explicit resize.
+      pixiApp.renderer.resize(w, h);
+
+      // Keep characters grounded after any resize/layout shift
+      positionCharacters();
+    } catch (e) {
+      console.warn("Pixi resize failed:", e);
+    }
+  };
+
+  // Re-size on common iOS layout shifts (address bar / orientation / keyboard)
+  window.addEventListener("resize", () => requestAnimationFrame(doResize));
+  window.addEventListener("orientationchange", () => setTimeout(doResize, 250));
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => setTimeout(doResize, 60));
+    window.visualViewport.addEventListener("scroll", () => setTimeout(doResize, 60));
   }
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) setTimeout(doResize, 200);
+  });
+
+  // WebGL context loss safety (rare, but happens on iPad)
+  const canvas = pixiApp.view;
+  canvas.addEventListener(
+    "webglcontextlost",
+    (e) => {
+      e.preventDefault();
+      console.warn("WebGL context lost");
+    },
+    false
+  );
+  canvas.addEventListener(
+    "webglcontextrestored",
+    () => {
+      console.warn("WebGL context restored");
+      setTimeout(doResize, 120);
+    },
+    false
+  );
+
+  // Initial layout
+  setTimeout(doResize, 0);
+}
 
   function createCharacters() {
     const drIdle = textureCache.drColi.idle || [];
@@ -556,13 +614,90 @@ function awardStar(sceneId) {
     if (unlockPromise) await unlockPromise;
   }
 
-  async function speakLine(text) {
-    await waitForUserInteraction();
-    const msg = personalizeText(text);
+
+// ===== iOS Safari audio stability helpers =====
+let tapToContinueEl = null;
+
+function showTapToContinue(message = "Tap to continue 🔊") {
+  if (tapToContinueEl) return;
+  const ui = document.getElementById("uiLayer") || document.body;
+
+  const el = document.createElement("div");
+  el.style.position = "absolute";
+  el.style.inset = "0";
+  el.style.display = "grid";
+  el.style.placeItems = "center";
+  el.style.background = "rgba(0,0,0,0.35)";
+  el.style.zIndex = "9999";
+  el.style.pointerEvents = "auto";
+
+  el.innerHTML = `
+    <div style="
+      background: rgba(255,255,255,0.92);
+      color:#222;
+      padding: 14px 18px;
+      border-radius: 18px;
+      font-weight: 900;
+      font-size: 18px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.20);
+      text-align:center;
+      max-width: 320px;
+    ">
+      ${message}
+    </div>
+  `;
+
+  tapToContinueEl = el;
+  ui.appendChild(el);
+}
+
+function hideTapToContinue() {
+  if (!tapToContinueEl) return;
+  tapToContinueEl.remove();
+  tapToContinueEl = null;
+}
+
+async function requireTapToContinue(message) {
+  showTapToContinue(message);
+  return await new Promise((resolve) => {
+    const handler = async () => {
+      try {
+        userInteracted = true;
+        if (resolveUnlock) resolveUnlock();
+        await window.DrColiAudio?.unlockAudioContext?.();
+      } catch {}
+      hideTapToContinue();
+      window.removeEventListener("pointerdown", handler);
+      resolve();
+    };
+    window.addEventListener("pointerdown", handler, { once: true });
+  });
+}
+
+async function speakLine(text) {
+  await waitForUserInteraction();
+  const msg = personalizeText(text);
+
+  // iOS Safari sometimes "pretends" to play audio (or blocks it) and our lesson auto-advances.
+  // If speaking fails or returns unrealistically fast, we pause and ask for a tap to continue.
+  const start = performance.now();
+  try {
+    await window.DrColiAudio?.speakElevenLabs?.(msg, { rate: TTS_RATE });
+    const dt = performance.now() - start;
+
+    // If it returned instantly, treat as blocked audio and recover.
+    if (dt < 120 && msg && msg.length > 3) {
+      await requireTapToContinue("Tap to continue 🔊");
+      await window.DrColiAudio?.speakElevenLabs?.(msg, { rate: TTS_RATE });
+    }
+  } catch (e) {
+    console.warn("speakLine failed; waiting for tap to re-unlock audio:", e);
+    await requireTapToContinue("Tap to continue 🔊");
     await window.DrColiAudio?.speakElevenLabs?.(msg, { rate: TTS_RATE });
   }
+}
 
-  async function playDialogue(lines, done) {
+async function playDialogue(lines, done) {
     if (!lines || lines.length === 0) {
       hideDialogue();
       done?.();
@@ -725,6 +860,9 @@ function awardStar(sceneId) {
         const { blob, speechStarted } = await recordOnceWithSpeechDetect({
           ms: RECORD_MS,
         });
+
+        // iOS Safari can shift layout after mic permission/recording; re-ground sprites.
+        try { positionCharacters(); } catch {}
 
         if (myRun !== sceneRunId) return;
 
