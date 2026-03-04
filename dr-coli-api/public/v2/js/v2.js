@@ -74,7 +74,7 @@
   let missionBarEl = null;
   let starEls = [];
   let missionTextEl = null;
-let missionTextTimer = null;
+  let missionTextTimer = null;
 
   // DOM
   let bgLayer,
@@ -118,9 +118,8 @@ let missionTextTimer = null;
 
     // Mission bar
     missionBarEl = document.getElementById("missionBar");
-    missionTextEl = document.getElementById("missionText");
+    missionTextEl = document.getElementById(\"missionText\");
     initStarsUI(); // safe even if missionBar isn't present
-    
 
     if (
       !bgLayer ||
@@ -242,53 +241,43 @@ let missionTextTimer = null;
     });
   }
 
+  
   function awardStar(sceneId) {
-  if (!sceneId) return;
-  if (starredScenes.has(sceneId)) return;
-  if (!starEls.length) initStarsUI();
-  if (!starEls.length) return;
-  if (starsEarned >= starEls.length) return;
+    if (!sceneId) return;
+    if (starredScenes.has(sceneId)) return;
+    if (!starEls.length) initStarsUI();
+    if (!starEls.length) return;
+    if (starsEarned >= starEls.length) return;
 
-  starredScenes.add(sceneId);
+    starredScenes.add(sceneId);
 
-  const el = starEls[starsEarned];
-  starsEarned += 1;
+    const el = starEls[starsEarned];
+    starsEarned += 1;
 
-  // ⭐ Update the star UI
-  if (el) {
-    el.textContent = "⭐";
+    if (el) {
+      el.textContent = "⭐";
 
-    el.classList.remove("pop");
-    void el.offsetWidth;
-    el.classList.add("pop");
-
-    setTimeout(() => {
       el.classList.remove("pop");
-    }, 260);
+      void el.offsetWidth;
+      el.classList.add("pop");
+      setTimeout(() => el.classList.remove("pop"), 260);
+    }
+
+    if (missionTextEl) {
+      if (missionTextTimer) clearTimeout(missionTextTimer);
+
+      if (starsEarned === 5) {
+        missionTextEl.textContent = "⭐⭐⭐⭐⭐ Bori is ready!";
+      } else {
+        missionTextEl.textContent = `⭐ Star earned! (${starsEarned}/5)`;
+
+        missionTextTimer = setTimeout(() => {
+          missionTextEl.textContent = "Collect 5 stars to help Bori!";
+        }, 1200);
+      }
+    }
   }
-}
 
-  // ⭐ Show temporary "Star earned!" message
-  if (missionTextEl) {
-
-    if (missionTextTimer) clearTimeout(missionTextTimer);
-
-    missionTextEl.textContent = `⭐ Star earned! (${starsEarned}/5)`;
-
-    missionTextTimer = setTimeout(() => {
-      missionTextEl.textContent = "Collect 5 stars to help Bori!";
-    }, 1200);
-  }
-}
-
-    if (!el) return;
-    el.textContent = "⭐";
-
-    el.classList.remove("pop");
-    void el.offsetWidth;
-    el.classList.add("pop");
-    setTimeout(() => el.classList.remove("pop"), 260);
-  }
 
   async function boot() {
     initPixi();
