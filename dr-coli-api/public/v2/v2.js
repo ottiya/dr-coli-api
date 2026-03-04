@@ -65,6 +65,7 @@
   let bgLayer,
     dialogueEl,
     dialogueTextEl,
+    missionBarEl,
     emojiTrayEl,
     micButtonEl,
     fxLayerEl,
@@ -94,6 +95,7 @@
     dialogueEl = document.getElementById("dialogue");
     dialogueTextEl = document.getElementById("dialogueText");
     emojiTrayEl = document.getElementById("emojiTray");
+    missionBarEl = document.getElementById("missionBar");
     micButtonEl = document.getElementById("micButton");
     fxLayerEl = document.getElementById("fxLayer");
     stageLayerEl = document.getElementById("stageLayer");
@@ -456,13 +458,15 @@
   }
 
   function showDialogue() {
-    dialogueEl.classList.add("active");
-  }
+  dialogueEl.classList.add("active");
+  if (missionBarEl) missionBarEl.classList.add("active");
+}
 
-  function hideDialogue() {
-    dialogueEl.classList.remove("active");
-    dialogueTextEl.textContent = "";
-  }
+function hideDialogue() {
+  dialogueEl.classList.remove("active");
+  if (missionBarEl) missionBarEl.classList.remove("active");
+  dialogueTextEl.textContent = "";
+}
 
   // ===== Audio unlock overlay + intro music sequence =====
   function ensureStartOverlay() {
