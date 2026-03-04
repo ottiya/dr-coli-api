@@ -9,6 +9,8 @@ body {
   background: #0b0b0b;
   overflow: hidden;
   font-family: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ====== Game viewport (keeps 16:9) ====== */
@@ -213,6 +215,13 @@ body {
 
 /* ====== Helpers ====== */
 .hidden { display: none !important; }
+
+button {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  outline: none;
+}
 
 /* ====== Mission Bar (Stars) ====== */
 .mission-bar {
