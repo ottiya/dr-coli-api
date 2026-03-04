@@ -1,41 +1,70 @@
-/* public/v2/js/audio.js */
-/* Global audio helper for Dr. Coli v2 (no build system needed) */
+/* public/v2/js/audio.js
+   Dr. Coli v2 Audio Module (no bundler needed)
+   - Intro music sequence (play ~2s, fade out)
+   - SFX helpers
+   - ElevenLabs TTS with music ducking
+*/
 
 (() => {
   if (window.DrColiAudio) return;
 
-  // ===== Sound Effects (public/assets/sound-effects) =====
+  // ===== Paths =====
   const SFX_INTRO = "/assets/sound-effects/ottiya-korean-intro-song.wav";
   const SFX_CORRECT = "/assets/sound-effects/correct-sound-effect.wav";
   const SFX_KIDS_HOORAY = "/assets/sound-effects/kids-hooray.wav";
   const SFX_KIDS_YAY = "/assets/sound-effects/kids-yay.wav";
-  const SFX_MIC_POP = "/assets/sound-effects/kids-giggle.wav"; // subtle “pop” substitute
+  const SFX_MIC_POP = "/assets/sound-effects/kids-giggle.wav";
 
-  // Volume ducking
-  const DUCKED_MUSIC_VOL = 0.22;
-  const NORMAL_MUSIC_VOL = 0.6;
-
-  // Audio objects
+  // ===== State =====
   let introMusic = null;
   let correctSfx = null;
   let kidsHooraySfx = null;
   let kidsYaySfx = null;
   let micPopSfx = null;
 
-  function makeAudio(url, volume = 1) {
-    const a = new Audio(url);
-    a.preload = "auto";
-    a.volume = volume;
-    return a;
+  let NORMAL_MUSIC_VOL = 0.6;
+  let DUCKED_MUSIC_VOL = 0.22;
+
+  function safePlay(aud) {
+    if (!aud) return Promise.resolve();
+    try {
+      aud.currentTime = 0;
+      return aud.play().catch(() => {});
+    } catch {
+      return Promise.resolve();
+    }
   }
 
-  function init() {
+  function init({ normalVol = 0.6, duckedVol = 0.22 } = {}) {
+    NORMAL_MUSIC_VOL = normalVol;
+    DUCKED_MUSIC_VOL = duckedVol;
+
     // Create once
-    introMusic = introMusic || makeAudio(SFX_INTRO, NORMAL_MUSIC_VOL);
-    correctSfx = correctSfx || makeAudio(SFX_CORRECT, 0.9);
-    kidsHooraySfx = kidsHooraySfx || makeAudio(SFX_KIDS_HOORAY, 0.9);
-    kidsYaySfx = kidsYaySfx || makeAudio(SFX_KIDS_YAY, 0.9);
-    micPopSfx = micPopSfx || makeAudio(SFX_MIC_POP, 0.25);
+    if (!introMusic) {
+      introMusic = new Audio(SFX_INTRO);
+      introMusic.loop = true;
+      introMusic.volume = NORMAL_MUSIC_VOL;
+    }
+
+    if (!correctSfx) {
+      correctSfx = new Audio(SFX_CORRECT);
+      correctSfx.volume = 0.85;
+    }
+
+    if (!kidsHooraySfx) {
+      kidsHooraySfx = new Audio(SFX_KIDS_HOORAY);
+      kidsHooraySfx.volume = 0.55;
+    }
+
+    if (!kidsYaySfx) {
+      kidsYaySfx = new Audio(SFX_KIDS_YAY);
+      kidsYaySfx.volume = 0.55;
+    }
+
+    if (!micPopSfx) {
+      micPopSfx = new Audio(SFX_MIC_POP);
+      micPopSfx.volume = 0.18;
+    }
   }
 
   async function unlockAudioContext() {
@@ -56,36 +85,41 @@
     }
   }
 
-  function duckMusicForSpeech(duck) {
-    try {
-      if (!introMusic) return;
-      introMusic.volume = duck ? DUCKED_MUSIC_VOL : NORMAL_MUSIC_VOL;
-    } catch {
-      // non-fatal
-    }
+  function duckMusicForSpeech(isDucked) {
+    if (!introMusic) return;
+    const target = isDucked ? DUCKED_MUSIC_VOL : NORMAL_MUSIC_VOL;
+    const steps = 8;
+    const start = introMusic.volume ?? NORMAL_MUSIC_VOL;
+    let i = 0;
+    const iv = setInterval(() => {
+      i++;
+      const t = i / steps;
+      introMusic.volume = start + (target - start) * t;
+      if (i >= steps) clearInterval(iv);
+    }, 35);
   }
 
-  async function fadeOutAudio(audio, ms = 900) {
-    if (!audio) return;
-    const startVol = audio.volume ?? 0.6;
-    const steps = 18;
-    const stepMs = Math.max(10, Math.floor(ms / steps));
-
-    for (let i = 0; i < steps; i++) {
-      const t = (i + 1) / steps;
-      audio.volume = Math.max(0, startVol * (1 - t));
-      await new Promise((r) => setTimeout(r, stepMs));
-    }
-
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-    } catch {
-      // non-fatal
-    }
-
-    // Restore default for next time
-    audio.volume = startVol;
+  function fadeOutAudio(aud, ms = 900) {
+    return new Promise((resolve) => {
+      if (!aud) return resolve();
+      const startVol = aud.volume ?? 0;
+      const steps = 15;
+      let i = 0;
+      const iv = setInterval(() => {
+        i++;
+        const t = i / steps;
+        aud.volume = Math.max(0, startVol * (1 - t));
+        if (i >= steps) {
+          clearInterval(iv);
+          try {
+            aud.pause();
+            aud.currentTime = 0;
+          } catch {}
+          aud.volume = startVol;
+          resolve();
+        }
+      }, Math.max(16, Math.floor(ms / steps)));
+    });
   }
 
   async function playIntroSequence({ holdMs = 2000, fadeMs = 900 } = {}) {
@@ -99,36 +133,75 @@
     } catch {
       // non-fatal
     }
-
     await new Promise((r) => setTimeout(r, holdMs));
     await fadeOutAudio(introMusic, fadeMs);
   }
 
   function playSfx(which) {
     init();
-    const map = {
-      correct: correctSfx,
-      hooray: kidsHooraySfx,
-      yay: kidsYaySfx,
-      mic: micPopSfx,
-    };
-    const a = map[which];
-    if (!a) return;
+    const pick =
+      which === "kids"
+        ? Math.random() < 0.5
+          ? kidsHooraySfx
+          : kidsYaySfx
+        : which === "correct"
+        ? correctSfx
+        : which === "mic"
+        ? micPopSfx
+        : null;
 
+    if (!pick) return;
     try {
-      a.currentTime = 0;
-      a.play();
-    } catch {
-      // non-fatal
+      pick.currentTime = 0;
+      pick.play().catch(() => {});
+    } catch {}
+  }
+
+  // ElevenLabs TTS (ducks introMusic while speaking)
+  async function speakElevenLabs(text, { rate = 1.25 } = {}) {
+    try {
+      duckMusicForSpeech(true);
+
+      const res = await fetch("/api/tts-elevenlabs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!res.ok) {
+        console.warn("ElevenLabs TTS error:", res.status);
+        duckMusicForSpeech(false);
+        return;
+      }
+
+      const data = await res.json();
+      const url = data?.url;
+      if (!url) {
+        duckMusicForSpeech(false);
+        return;
+      }
+
+      const audio = new Audio(url);
+      audio.playbackRate = rate;
+
+      await audio.play();
+      await new Promise((resolve) => {
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+      });
+
+      duckMusicForSpeech(false);
+    } catch (err) {
+      duckMusicForSpeech(false);
+      console.warn("TTS playback failed (non-fatal):", err);
     }
   }
 
   window.DrColiAudio = {
     init,
     unlockAudioContext,
-    duckMusicForSpeech,
-    fadeOutAudio,
     playIntroSequence,
     playSfx,
+    speakElevenLabs,
   };
 })();
