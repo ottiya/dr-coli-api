@@ -216,7 +216,6 @@ body {
 
 /* ====== Mission Bar (Stars) ====== */
 .mission-bar {
-  display: none; 
   position: absolute;
   left: 50%;
   /* Place it just under the dialogue bubble */
@@ -300,9 +299,4 @@ body {
   .mission-icon { font-size: 24px; }
   .mission-stars .star { font-size: 26px; gap: 8px; }
   .mission-text { font-size: 16px; }
-}
-
-/* Show mission bar only when dialogue bubble is active */
-#dialogue.active + #missionBar {
-  display: grid;
 }
