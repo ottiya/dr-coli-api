@@ -9,7 +9,7 @@
         "animation": "talk",
         "say": [
           "Hello, dear friends! My name is Dr. Coli.",
-          "I’ll be teaching you Korean.",
+          "Let's learn Korean together!",
           "You can also call me Coli 선생님."
         ]
       },
@@ -22,6 +22,7 @@
       "drColi": {
         "animation": "talk",
         "say": [
+          "Bori is here to learn too! She's a puppy.",
           "Bori wants to say hello to 선생님 today.",
           "Let’s teach Bori the word for teacher.",
           "선생님 means teacher in Korean.",
@@ -47,8 +48,6 @@
       "drColi": {
         "animation": "talk",
         "say": [
-          "And this is my friend Bori.",
-          "Bori is a puppy!",
           "Bori and I are so happy you’re here!"
         ]
       },
@@ -84,8 +83,7 @@
       "drColi": {
         "animation": "bow",
         "say": [
-          "If we can say this, Bori can greet politely!",
-          "Now let’s try it together.",
+          "Now let’s try it together with Bori.",
           "Ready? 안녕하세요!"
         ]
       },
@@ -96,7 +94,7 @@
         "prompt": "Tap the mic, then say 안녕하세요!",
         "strictness": "easy",
         "onSuccessSay": [
-          "Great remembering!",
+          "Great job!",
           "Wonderful! That’s another star!"
         ],
         "onFailSay": ["So close! Let’s try together one more time."]
@@ -131,7 +129,7 @@
         "animation": "talk",
         "say": [
           "Now let me teach you one more hello.",
-          "When you see your friends or Bori, you can say: 안녕.",
+          "When you see your friends or Bori, you can say: 안녕!",
           "And when we say 안녕, we wave!"
         ]
       },
