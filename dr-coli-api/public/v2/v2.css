@@ -266,6 +266,25 @@ body {
   text-shadow: 0 2px 3px rgba(0,0,0,0.25);
 }
 
+/* Star pop animation when earned */
+.star.pop {
+  animation: starPop 0.22s ease-out;
+}
+
+@keyframes starPop {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.45);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
 .mission-text {
   font-size: 18px;
   font-weight: 800;
