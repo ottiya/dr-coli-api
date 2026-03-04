@@ -314,6 +314,12 @@ body {
   background:rgba(0,0,0,.35);
   backdrop-filter:blur(6px);
   z-index:50;
+
+  /* ✅ allow scrolling on small screens */
+  overflow:auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .start-card{
@@ -554,5 +560,17 @@ body {
 @media (max-width: 560px){
   .theme-tile:nth-child(3){
     grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px){
+  /* ✅ shift the card upward on mobile */
+  .start-overlay{
+    align-items: flex-start;
+    padding-top: 24px;
+  }
+
+  .start-card{
+    margin-top: 8px; /* small gap from top */
   }
 }
