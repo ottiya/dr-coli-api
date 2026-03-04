@@ -1,132 +1,204 @@
 {
-"id": "episode-01",
-"title": "안녕하세요! 안녕!",
-"background": "bg-puppies.png",
-"scenes": [
- {
-   "id": "s0-welcome",
-   "drColi": {
-     "animation": "talk",
-     "say": [
-       "Hello, dear friends! My name is Dr. Coli.",
-       "I’ll be teaching you Korean.",
-       "You can also call me Coli 선생님."
-     ]
-   },
-   "bori": { "animation": "look" },
-   "interaction": { "type": "none" }
- },
- {
-   "id": "s1-teach-seonsaengnim",
-   "drColi": {
-     "animation": "talk",
-     "say": [
-       "선생님 means teacher in Korean.",
-       "Can you try to say 선생님 with me?"
-     ]
-   },
-   "bori": { "animation": "look" },
-   "interaction": {
-     "type": "mic",
-     "targets": ["선생님", "선생님이에요", "선생님 입니다"],
-     "prompt": "Tap the mic, then say 선생님!",
-     "strictness": "easy",
-     "onSuccessSay": ["Yes!! Amazing job!"],
-     "onFailSay": ["So close! Let’s try together one more time."]
-   }
- },
- {
-   "id": "s2-meet-bori",
-   "drColi": {
-     "animation": "talk",
-     "say": [
-       "And this is my friend Bori.",
-       "Bori is a puppy!",
-       "Bori and I are so happy you’re here!"
-     ]
-   },
-   "bori": { "animation": "wave" },
-   "interaction": { "type": "none" }
- },
- {
-   "id": "s3a-intro-annyonghaseyo",
-   "drColi": {
-     "animation": "talk",
-     "say": [
-       "Since it’s so nice to meet each other, let’s say hello in Korean.",
-       "In Korean, when we meet adults, we say: 안녕하세요."
-     ]
-   },
-   "bori": { "animation": "idle" },
-   "interaction": { "type": "none" }
- },
- {
-   "id": "s3b-bow-like-this",
-   "drColi": {
-     "animation": "talk",
-     "say": ["When we say 안녕하세요, we do a little bow. Like this!"]
-   },
-   "bori": { "animation": "bow" },
-   "interaction": { "type": "none" }
- },
- {
-   "id": "s4-repeat-annyonghaseyo",
-   "drColi": {
-     "animation": "bow",
-     "say": ["Now let’s try it together.", "Ready? 안녕하세요!"]
-   },
-   "bori": { "animation": "bow" },
-   "interaction": {
-     "type": "mic",
-     "targets": ["안녕하세요", "안녕하세이요", "안녕하세요 선생님"],
-     "prompt": "Tap the mic, then say 안녕하세요!",
-     "strictness": "easy",
-     "onSuccessSay": ["Yes!! Amazing job!"],
-     "onFailSay": ["So close! Let’s try together one more time."]
-   }
- },
- {
-   "id": "s5-emoji-check-annyonghaseyo",
-   "drColi": {
-     "animation": "talk",
-     "say": ["Quick check!", "How do we say 안녕하세요?"]
-   },
-   "bori": { "animation": "look" },
-   "interaction": {
-     "type": "emoji",
-     "choices": ["🙇‍♀️", "👋", "🏃‍♀️"],
-     "correctIndex": 0,
-     "onCorrectSay": ["Yes! We bow when we say 안녕하세요!"],
-     "onWrongSay": ["Nice try! Let’s try again. How do we say 안녕하세요?"]
-   }
- },
- {
-   "id": "s6-intro-annyong",
-   "drColi": {
-     "animation": "talk",
-     "say": [
-       "Now let me teach you one more hello.",
-       "When you see your friends or Bori, you can say: 안녕.",
-       "And when we say 안녕, we wave!"
-     ]
-   },
-   "bori": { "animation": "wave" },
-   "interaction": { "type": "none" }
- },
- {
-   "id": "s7-emoji-check-annyon",
-   "drColi": {
-     "animation": "talk",
-     "say": ["Quick check!", "How do we say 안녕?"]
-   },
-   "bori": { "animation": "look" },
-   "interaction": {
-     "type": "emoji",
-     "choices": ["🙇‍♀️", "👋", "🏃‍♀️"],
-     "correctIndex": 1,
-     "onCorrectSay": ["Yes! We wave when we say 안녕!"],
-     "onWrongSay": ["Nice try! Let’s try again. How do we say 안녕?"]
-   }
- }
-]
+  "id": "episode-01",
+  "title": "안녕하세요! 안녕!",
+  "background": "bg-puppies.png",
+  "scenes": [
+    {
+      "id": "s0-welcome",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Hello, dear friends! My name is Dr. Coli.",
+          "I’ll be teaching you Korean.",
+          "You can also call me Coli 선생님."
+        ]
+      },
+      "bori": { "animation": "look" },
+      "interaction": { "type": "none" }
+    },
+
+    {
+      "id": "s1-teach-seonsaengnim",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Bori wants to say hello to 선생님 today.",
+          "Let’s teach Bori the word for teacher.",
+          "선생님 means teacher in Korean.",
+          "Can you try to say 선생님 with me?"
+        ]
+      },
+      "bori": { "animation": "look" },
+      "interaction": {
+        "type": "mic",
+        "targets": ["선생님", "선생님이에요", "선생님 입니다"],
+        "prompt": "Tap the mic, then say 선생님!",
+        "strictness": "easy",
+        "onSuccessSay": [
+          "Wonderful! Bori is learning!",
+          "Excellent! That’s one star!"
+        ],
+        "onFailSay": ["So close! Let’s try together one more time."]
+      }
+    },
+
+    {
+      "id": "s2-meet-bori",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "And this is my friend Bori.",
+          "Bori is a puppy!",
+          "Bori and I are so happy you’re here!"
+        ]
+      },
+      "bori": { "animation": "wave" },
+      "interaction": { "type": "none" }
+    },
+
+    {
+      "id": "s3a-intro-annyonghaseyo",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Since it’s so nice to meet each other, let’s say hello in Korean.",
+          "In Korean, when we meet adults, we say: 안녕하세요."
+        ]
+      },
+      "bori": { "animation": "idle" },
+      "interaction": { "type": "none" }
+    },
+
+    {
+      "id": "s3b-bow-like-this",
+      "drColi": {
+        "animation": "talk",
+        "say": ["When we say 안녕하세요, we do a little bow. Like this!"]
+      },
+      "bori": { "animation": "bow" },
+      "interaction": { "type": "none" }
+    },
+
+    {
+      "id": "s4-repeat-annyonghaseyo",
+      "drColi": {
+        "animation": "bow",
+        "say": [
+          "If we can say this, Bori can greet politely!",
+          "Now let’s try it together.",
+          "Ready? 안녕하세요!"
+        ]
+      },
+      "bori": { "animation": "bow" },
+      "interaction": {
+        "type": "mic",
+        "targets": ["안녕하세요", "안녕하세이요", "안녕하세요 선생님"],
+        "prompt": "Tap the mic, then say 안녕하세요!",
+        "strictness": "easy",
+        "onSuccessSay": [
+          "Great remembering!",
+          "Wonderful! That’s another star!"
+        ],
+        "onFailSay": ["So close! Let’s try together one more time."]
+      }
+    },
+
+    {
+      "id": "s5-emoji-check-annyonghaseyo",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Help Bori remember!",
+          "When we say 안녕하세요, what do we do?"
+        ]
+      },
+      "bori": { "animation": "look" },
+      "interaction": {
+        "type": "emoji",
+        "choices": ["🙇‍♀️", "👋", "🏃‍♀️"],
+        "correctIndex": 0,
+        "onCorrectSay": [
+          "Yes! We bow when we say 안녕하세요!",
+          "Excellent! That’s one more star!"
+        ],
+        "onWrongSay": ["Nice try! Let’s try again."]
+      }
+    },
+
+    {
+      "id": "s6-intro-annyeong",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Now let me teach you one more hello.",
+          "When you see your friends or Bori, you can say: 안녕.",
+          "And when we say 안녕, we wave!"
+        ]
+      },
+      "bori": { "animation": "wave" },
+      "interaction": { "type": "none" }
+    },
+
+    {
+      "id": "s7-emoji-check-annyeong",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Help Bori remember!",
+          "When we say 안녕, what do we do?"
+        ]
+      },
+      "bori": { "animation": "look" },
+      "interaction": {
+        "type": "emoji",
+        "choices": ["🙇‍♀️", "👋", "🏃‍♀️"],
+        "correctIndex": 1,
+        "onCorrectSay": [
+          "Yes! We wave when we say 안녕!",
+          "Wonderful! Another star!"
+        ],
+        "onWrongSay": ["Nice try! Let’s try again."]
+      }
+    },
+
+    {
+      "id": "s8-hello-seonsaengnim",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Alright friends. Let’s put it together now.",
+          "Bori is almost ready.",
+          "How do we say hello to a teacher in Korean?",
+          "We say 안녕하세요 선생님!"
+        ]
+      },
+      "bori": { "animation": "idle" },
+      "interaction": { "type": "none" }
+    },
+
+    {
+      "id": "s9-repeat-annyeonghaseyo-seonsaengnim",
+      "drColi": {
+        "animation": "bow",
+        "say": [
+          "This is the big moment.",
+          "Ready to help Bori greet 선생님?",
+          "Now let’s try it together.",
+          "Ready? 안녕하세요 선생님!"
+        ]
+      },
+      "bori": { "animation": "bow" },
+      "interaction": {
+        "type": "mic",
+        "targets": ["안녕하세요 선생님", "안녕하세요", "안녕하세이요"],
+        "prompt": "Tap the mic, then say 안녕하세요 선생님!",
+        "strictness": "easy",
+        "onSuccessSay": [
+          "Bori is ready to greet 선생님!",
+          "Wonderful! You earned all the stars!"
+        ],
+        "onFailSay": ["So close! Let’s try together one more time."]
+      }
+    }
+  ]
 }
