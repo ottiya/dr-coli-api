@@ -229,7 +229,7 @@ body {
   place-items: center;
 
   padding: 10px 16px;
-  border-radius: 18px;
+  border-radius: 30px;
   background: #000000;
   box-shadow: 0 10px 24px rgba(0,0,0,0.16);
   backdrop-filter: blur(6px);
