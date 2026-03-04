@@ -1222,9 +1222,6 @@ const res = await fetch("/api/tts-elevenlabs", {
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
   }
-// cache: characterKey -> stateName -> textures[]
-  const textureCache = { drColi: {}, bori: {} };
-  const charState = { drColi: "idle", bori: "idle" };
 
   // ===== Stars (Mission Progress) =====
   let starsEarned = 0;
