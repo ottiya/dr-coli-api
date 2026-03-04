@@ -186,9 +186,16 @@
       });
     });
 
+    // Start button begins disabled until characters are loaded
+    if (startButtonEl) {
+      startButtonEl.disabled = true;
+      startButtonEl.textContent = "Waiting for Dr. Coli and Bori…🐶";
+    }
+
     // Wire Start button click
     if (startButtonEl) {
       startButtonEl.addEventListener("click", async () => {
+        if (!assetsReadyToStart) return;
         startButtonEl.disabled = true;
 
         // Save name + theme (sticky)
@@ -301,6 +308,13 @@ function awardStar(sceneId) {
 
     createCharacters();
     assetsReadyToStart = true;
+
+    // Enable Start button now that Dr. Coli + Bori are ready
+    if (startButtonEl) {
+      startButtonEl.disabled = false;
+      startButtonEl.textContent = "Let's start!";
+    }
+
     maybeStartEpisode();
   }
 
@@ -805,9 +819,39 @@ function awardStar(sceneId) {
     }
   }
 
-  async function recordOnce({ ms = 2600 } = {}) {
+  
+  function pickBestRecorderMimeType() {
+    try {
+      const MR = window.MediaRecorder;
+      if (!MR || typeof MR.isTypeSupported !== "function") return "";
+      const candidates = [
+        "audio/mp4;codecs=mp4a.40.2",
+        "audio/mp4",
+        "audio/aac",
+        "audio/webm;codecs=opus",
+        "audio/webm",
+      ];
+      for (const t of candidates) {
+        if (MR.isTypeSupported(t)) return t;
+      }
+      return "";
+    } catch {
+      return "";
+    }
+  }
+
+  function filenameForMime(mime) {
+    const m = (mime || "").toLowerCase();
+    if (m.includes("mp4") || m.includes("m4a")) return "speech.m4a";
+    if (m.includes("aac")) return "speech.aac";
+    if (m.includes("webm")) return "speech.webm";
+    return "speech.webm";
+  }
+
+async function recordOnce({ ms = 2600 } = {}) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const rec = new MediaRecorder(stream);
+    const preferredMime = pickBestRecorderMimeType();
+    const rec = preferredMime ? new MediaRecorder(stream, { mimeType: preferredMime }) : new MediaRecorder(stream);
     const chunks = [];
 
     return await new Promise((resolve, reject) => {
@@ -817,7 +861,7 @@ function awardStar(sceneId) {
       rec.onerror = (e) => reject(e.error || e);
       rec.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
-        resolve(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
+        resolve(new Blob(chunks, { type: (preferredMime || rec.mimeType || "audio/webm") }));
       };
       rec.start();
       setTimeout(() => rec.stop(), ms);
@@ -830,7 +874,8 @@ function awardStar(sceneId) {
     rmsThreshold = SPEECH_RMS_THRESHOLD,
   } = {}) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const rec = new MediaRecorder(stream);
+    const preferredMime = pickBestRecorderMimeType();
+    const rec = preferredMime ? new MediaRecorder(stream, { mimeType: preferredMime }) : new MediaRecorder(stream);
     const chunks = [];
 
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -876,7 +921,7 @@ function awardStar(sceneId) {
         };
         rec.onerror = (e) => reject(e.error || e);
         rec.onstop = () =>
-          resolve(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
+          resolve(new Blob(chunks, { type: (preferredMime || rec.mimeType || "audio/webm") }));
         rec.start();
         setTimeout(() => rec.stop(), ms);
       });
@@ -895,7 +940,7 @@ function awardStar(sceneId) {
 
   async function sttViaOpenAI(blob) {
     const fd = new FormData();
-    fd.append("file", blob, "speech.webm");
+    fd.append("file", blob, filenameForMime(blob?.type || ""));
     fd.append("model", STT_MODEL);
     fd.append("language", STT_LANGUAGE);
 
