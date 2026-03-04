@@ -39,6 +39,8 @@
 
   // ===== State =====
   let currentSceneIndex = 0;
+  let currentSceneId = null;
+
   let micBusy = false;
   let sceneRunId = 0;
   let pendingAdvanceTimer = null;
@@ -52,6 +54,12 @@
   // cache: characterKey -> stateName -> textures[]
   const textureCache = { drColi: {}, bori: {} };
   const charState = { drColi: "idle", bori: "idle" };
+
+  // ===== Stars (Mission Progress) =====
+  let starsEarned = 0;
+  const starredScenes = new Set(); // prevent duplicate stars per scene
+  let missionBarEl = null;
+  let starEls = [];
 
   // DOM
   let bgLayer,
@@ -90,6 +98,10 @@
     fxLayerEl = document.getElementById("fxLayer");
     stageLayerEl = document.getElementById("stageLayer");
 
+    // NEW: mission bar
+    missionBarEl = document.getElementById("missionBar");
+    initStarsUI(); // safe even if missionBar isn't present
+
     if (
       !bgLayer ||
       !dialogueEl ||
@@ -111,6 +123,44 @@
 
     boot().catch((err) => console.error("BOOT ERROR:", err));
   });
+
+  // ===== Stars helpers =====
+  function initStarsUI() {
+    if (!missionBarEl) return;
+    starEls = Array.from(missionBarEl.querySelectorAll(".star"));
+  }
+
+  function resetStars() {
+    starsEarned = 0;
+    starredScenes.clear();
+    if (!starEls.length) initStarsUI();
+    starEls.forEach((el) => {
+      el.textContent = "☆";
+      el.classList.remove("pop");
+    });
+  }
+
+  function awardStar(sceneId) {
+    if (!sceneId) return;
+    if (starredScenes.has(sceneId)) return;
+    if (!starEls.length) initStarsUI();
+    if (!starEls.length) return;
+    if (starsEarned >= starEls.length) return;
+
+    starredScenes.add(sceneId);
+
+    const el = starEls[starsEarned];
+    starsEarned += 1;
+
+    if (!el) return;
+    el.textContent = "⭐";
+
+    // pop animation (CSS handles it)
+    el.classList.remove("pop");
+    void el.offsetWidth; // force reflow so animation can replay
+    el.classList.add("pop");
+    setTimeout(() => el.classList.remove("pop"), 260);
+  }
 
   async function boot() {
     setBackground(DEFAULT_BG);
@@ -156,6 +206,8 @@
     if (maybeStartEpisode.__started) return;
     maybeStartEpisode.__started = true;
 
+    // NEW: reset stars at episode start
+    resetStars();
     playScene(0);
   }
 
@@ -366,6 +418,9 @@
     currentSceneIndex = index;
     const scene = episodeData?.scenes?.[index];
     if (!scene) return;
+
+    // NEW: remember current scene id for star awarding
+    currentSceneId = scene.id || String(index);
 
     setBackground(scene.background || episodeData.background || DEFAULT_BG);
 
@@ -580,9 +635,12 @@
       btn.textContent = choices[i] || "";
       btn.onclick = async () => {
         if (i === correctIndex) {
-          await celebrateCorrect(
-            interaction.onCorrectSay?.[0] || "Yes!! Amazing job!"
-          );
+          // NEW: award star on correct emoji
+          awardStar(currentSceneId);
+
+          // NEW: speak 2-line praise if present
+          await celebrateCorrect(interaction.onCorrectSay || "Yes!! Amazing job!");
+
           emojiTrayEl.classList.remove("active");
           setTimeout(() => {
             emojiTrayEl.classList.add("hidden");
@@ -603,9 +661,11 @@
       ? interaction.targets.map((t) => String(t || "").trim()).filter(Boolean)
       : [
           String(
-            interaction?.target || interaction?.phrase || interaction?.expected || ""
-          )
-            .trim(),
+            interaction?.target ||
+              interaction?.phrase ||
+              interaction?.expected ||
+              ""
+          ).trim(),
         ].filter(Boolean);
 
     const strictness = interaction?.strictness || "easy";
@@ -661,7 +721,9 @@
         setBori("idle").catch(() => {});
 
         // 🔴 Record + detect speech (no STT cost if silent)
-        const { blob, speechStarted } = await recordOnceWithSpeechDetect({ ms: RECORD_MS });
+        const { blob, speechStarted } = await recordOnceWithSpeechDetect({
+          ms: RECORD_MS,
+        });
 
         // If scene changed while recording, ignore
         if (myRun !== sceneRunId) return;
@@ -685,31 +747,28 @@
         }
 
         // Start STT/check immediately (overlaps with “One moment!”)
-const checkPromise = listenAndCheckPhrase(targets, strictness, blob);
+        const checkPromise = listenAndCheckPhrase(targets, strictness, blob);
 
-// Show processing UI
-micButtonEl.classList.add("processing");
-dialogueEl.classList.add("active");
-dialogueTextEl.textContent = "One moment!";
+        // Show processing UI
+        micButtonEl.classList.add("processing");
+        dialogueEl.classList.add("active");
+        dialogueTextEl.textContent = "One moment!";
 
-// Speak while STT runs
-await setDrColi("talk").catch(() => {});
-const oneMomentPromise = speakLine("One moment!");
+        // Speak while STT runs
+        await setDrColi("talk").catch(() => {});
+        const oneMomentPromise = speakLine("One moment!");
 
-// Keep it visible at least a little
-const minProcessingTime = sleep(350);
+        // Keep it visible at least a little
+        const minProcessingTime = sleep(350);
 
-// Wait for STT + minimum UI time + the “One moment!” voice
-const [result] = await Promise.all([
-  checkPromise,
-  minProcessingTime,
-  oneMomentPromise,
-]).then(([r]) => [r]);
+        // Wait for STT + minimum UI time + the “One moment!” voice
+        const [result] = await Promise.all([
+          checkPromise,
+          minProcessingTime,
+          oneMomentPromise,
+        ]).then(([r]) => [r]);
 
-await setDrColi("idle").catch(() => {});
-micButtonEl.classList.remove("processing");
-
-        // Remove processing glow
+        await setDrColi("idle").catch(() => {});
         micButtonEl.classList.remove("processing");
 
         // If scene changed while recording/transcribing, ignore
@@ -718,9 +777,12 @@ micButtonEl.classList.remove("processing");
         micButtonEl.disabled = false;
 
         if (result.ok) {
-          await celebrateCorrect(
-            interaction?.onSuccessSay?.[0] || "Yes!! Amazing job!"
-          );
+          // NEW: award star on mic success
+          awardStar(currentSceneId);
+
+          // NEW: speak 2-line praise if present
+          await celebrateCorrect(interaction?.onSuccessSay || "Yes!! Amazing job!");
+
           if (myRun !== sceneRunId) return;
           micButtonEl.classList.add("hidden");
           playScene(currentSceneIndex + 1);
@@ -791,7 +853,11 @@ micButtonEl.classList.remove("processing");
   }
 
   // Record audio AND detect whether the kid actually spoke (simple RMS VAD)
-  async function recordOnceWithSpeechDetect({ ms = RECORD_MS, minSpeakMs = MIN_SPEECH_MS, rmsThreshold = SPEECH_RMS_THRESHOLD } = {}) {
+  async function recordOnceWithSpeechDetect({
+    ms = RECORD_MS,
+    minSpeakMs = MIN_SPEECH_MS,
+    rmsThreshold = SPEECH_RMS_THRESHOLD,
+  } = {}) {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const rec = new MediaRecorder(stream);
     const chunks = [];
@@ -839,7 +905,8 @@ micButtonEl.classList.remove("processing");
           if (e.data && e.data.size) chunks.push(e.data);
         };
         rec.onerror = (e) => reject(e.error || e);
-        rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
+        rec.onstop = () =>
+          resolve(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
         rec.start();
         setTimeout(() => rec.stop(), ms);
       });
@@ -847,8 +914,12 @@ micButtonEl.classList.remove("processing");
       return { blob, speechStarted };
     } finally {
       if (interval) clearInterval(interval);
-      try { if (ctx) await ctx.close(); } catch {}
-      try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+      try {
+        if (ctx) await ctx.close();
+      } catch {}
+      try {
+        stream.getTracks().forEach((t) => t.stop());
+      } catch {}
     }
   }
 
@@ -936,7 +1007,8 @@ micButtonEl.classList.remove("processing");
   }
 
   // ===== Celebration + confetti + SFX stack =====
-  async function celebrateCorrect(praiseLine) {
+  // UPDATED: accept either a string OR an array of lines (2-line praise)
+  async function celebrateCorrect(praiseLines) {
     const prevDr = charState.drColi;
     const prevBori = charState.bori;
 
@@ -952,10 +1024,16 @@ micButtonEl.classList.remove("processing");
 
     spawnFullScreenConfetti();
 
-    dialogueEl.classList.add("active");
-    dialogueTextEl.textContent = String(praiseLine || "");
+    const lines = Array.isArray(praiseLines)
+      ? praiseLines.map((x) => String(x || "").trim()).filter(Boolean)
+      : [String(praiseLines || "").trim()].filter(Boolean);
 
-    await speakLine(praiseLine);
+    for (const line of lines) {
+      dialogueEl.classList.add("active");
+      dialogueTextEl.textContent = line;
+      await speakLine(line);
+      await sleep(BETWEEN_LINES_MS);
+    }
 
     await setDrColi(prevDr).catch(() => {});
     await setBori(prevBori).catch(() => {});
