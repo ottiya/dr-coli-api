@@ -30,6 +30,54 @@
       <!-- UI -->
       <div id="uiLayer">
 
+  <!-- START SCREEN -->
+  <div id="startScreen" class="start-overlay">
+
+    <div class="start-card">
+
+      <div class="start-header">
+        <div class="episode-badge">1</div>
+        <h2>Episode 1: Hello Explorer!</h2>
+        <p class="mission-preview">Collect ⭐⭐⭐⭐⭐</p>
+        <p class="start-instructions">Choose a theme and enter your name!</p>
+      </div>
+
+      <div class="theme-grid">
+
+        <div class="theme-tile selected" data-theme="puppies">
+          <div class="theme-emoji">🐶</div>
+          <div class="theme-label">Puppies</div>
+          <div class="theme-check">✓</div>
+        </div>
+
+        <div class="theme-tile" data-theme="dino">
+          <div class="theme-emoji">🦕</div>
+          <div class="theme-label">Dino</div>
+          <div class="theme-check">✓</div>
+        </div>
+
+        <div class="theme-tile" data-theme="airport">
+          <div class="theme-emoji">✈️</div>
+          <div class="theme-label">Airport</div>
+          <div class="theme-check">✓</div>
+        </div>
+
+      </div>
+
+      <div class="name-input">
+        <label>Your name (optional)</label>
+        <input id="kidName" type="text" placeholder="Type your name here">
+        <small>You can change this anytime.</small>
+      </div>
+
+      <button id="startButton" class="start-btn">
+        Start! ⭐⭐⭐⭐⭐
+      </button>
+
+    </div>
+
+  </div>
+
         <!-- Dialogue -->
         <div id="dialogue" class="dialogue">
           <img src="/assets/ui/dialogue-bubble.png" alt="dialogue bubble">
