@@ -545,3 +545,14 @@ body {
     min-height: 78px;
   }
 }
+
+
+/* =========================
+   MOBILE PATCH v2 (Theme tiles layout)
+   - If there are 3 tiles and we show 2 columns, make the 3rd tile span full width
+========================= */
+@media (max-width: 560px){
+  .theme-tile:nth-child(3){
+    grid-column: 1 / -1;
+  }
+}
