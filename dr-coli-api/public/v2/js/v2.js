@@ -365,6 +365,14 @@ function initPixi() {
       if (!pixiApp || !stageLayerEl) return;
 
       const rect = stageLayerEl.getBoundingClientRect();
+
+      // iOS Safari can report a temporary tiny size during UI/layout shifts (mic permission bar, address bar).
+      // If we resize to ~1px we can push characters off-screen. Skip and retry shortly.
+      if (rect.width < 200 || rect.height < 200) {
+        setTimeout(() => requestAnimationFrame(doResize), 140);
+        return;
+      }
+
       const w = Math.max(1, Math.round(rect.width));
       const h = Math.max(1, Math.round(rect.height));
 
@@ -456,6 +464,21 @@ function initPixi() {
 
     drColiSprite.y = groundY + 0;
     boriSprite.y = groundY + 10;
+  }
+
+
+  function resizePixiNow() {
+    try {
+      if (!pixiApp || !stageLayerEl) return;
+      const rect = stageLayerEl.getBoundingClientRect();
+      if (rect.width < 200 || rect.height < 200) return;
+      const w = Math.round(rect.width);
+      const h = Math.round(rect.height);
+      pixiApp.renderer.resize(w, h);
+      positionCharacters();
+    } catch (e) {
+      console.warn(\"resizePixiNow failed:\", e);
+    }
   }
 
   function playCharacterState(
@@ -678,15 +701,23 @@ async function speakLine(text) {
   await waitForUserInteraction();
   const msg = personalizeText(text);
 
-  // iOS Safari sometimes "pretends" to play audio (or blocks it) and our lesson auto-advances.
-  // If speaking fails or returns unrealistically fast, we pause and ask for a tap to continue.
+  // iOS Safari sometimes blocks/interrupts audio playback.
+  // DrColiAudio.speakElevenLabs may resolve even if playback didn't actually happen,
+  // so we use a conservative "expected minimum time" based on message length.
   const start = performance.now();
+
+  const expectedMinMs = (() => {
+    const len = (msg || "").length;
+    // Base + per-char, clamped. (Kids TTS should never be "instant")
+    return Math.max(650, Math.min(2600, 520 + len * 24));
+  })();
+
   try {
     await window.DrColiAudio?.speakElevenLabs?.(msg, { rate: TTS_RATE });
     const dt = performance.now() - start;
 
-    // If it returned instantly, treat as blocked audio and recover.
-    if (dt < 120 && msg && msg.length > 3) {
+    // If it returned too quickly, assume audio didn't actually play.
+    if (dt < expectedMinMs && msg && msg.length > 3) {
       await requireTapToContinue("Tap to continue 🔊");
       await window.DrColiAudio?.speakElevenLabs?.(msg, { rate: TTS_RATE });
     }
@@ -862,7 +893,7 @@ async function playDialogue(lines, done) {
         });
 
         // iOS Safari can shift layout after mic permission/recording; re-ground sprites.
-        try { positionCharacters(); } catch {}
+        try { resizePixiNow(); } catch {}
 
         if (myRun !== sceneRunId) return;
 
