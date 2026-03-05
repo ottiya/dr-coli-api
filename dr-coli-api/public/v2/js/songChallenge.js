@@ -73,7 +73,7 @@
       try { window.confettiBurst(x,y,count); } catch {}
     }
   }
-  }
+
 
   function existingEmojiButtons(){
     const btns=Array.from(document.querySelectorAll('.emoji-slot'));
