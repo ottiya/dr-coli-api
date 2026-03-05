@@ -8,36 +8,20 @@
 
   // Normalize asset paths so they work even when this file is served from /v2/
   function normalizeAssetPath(p) {
-    if (!p) return "";
-    // allow passing full URLs
-    if (/^https?:\/\//i.test(p)) return p;
-    // keep absolute paths absolute
-    if (p.startsWith("/")) return p;
-    return "/" + p.replace(/^\.?\//, "");
-  }
+    if (!p) return [];
+    let norm = String(p).trim();
 
-  // When running under /v2/ on Vercel, some assets may be reachable both at:
-  //   /assets/...   (recommended)
-  // and sometimes at:
-  //   /v2/assets/... (if the site is nested)
-  // We try a small list of candidates and pick the first that exists.
-  function assetCandidates(p) {
-    const norm = normalizeAssetPath(p);
-    if (!norm) return [];
-    const list = [norm];
+    // Common inputs: "assets/...", "/assets/...", "./assets/..."
+    norm = norm.replace(/^\.\//, "");
+    if (norm.startsWith("assets/")) norm = "/" + norm;
+    if (!norm.startsWith("/")) norm = "/" + norm;
 
-    // If we're currently under /v2/ and the path is /assets/..., also try /v2/assets/...
-    if (location.pathname.startsWith("/v2/") && norm.startsWith("/assets/")) {
-      list.push("/v2" + norm);
+    // If someone accidentally stored /v2/assets/..., prefer root /assets/...
+    if (norm.startsWith("/v2/assets/")) {
+      return [norm.replace(/^\/v2/, ""), norm];
     }
 
-    // If the path is /v2/assets/... but we're not under /v2/, also try /assets/...
-    if (!location.pathname.startsWith("/v2/") && norm.startsWith("/v2/assets/")) {
-      list.push(norm.replace(/^\/v2/, ""));
-    }
-
-    // De-dupe
-    return Array.from(new Set(list));
+    return [norm];
   }
 
   async function pickFirstAvailable(urls) {
@@ -249,7 +233,7 @@
     const ui=buildBoard(normalizeAssetPath(interaction.board||'assets/ui/magic-board.png'));
 
     const song = new Audio();
-    song.preload = \"auto\";
+    song.preload = "auto";
     song.src = await resolveAsset(interaction.song||'');
     
     song.preload='auto';
