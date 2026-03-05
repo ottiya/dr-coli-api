@@ -7,19 +7,23 @@
 */
 
   // Normalize asset paths so they work even when this file is served from /v2/
-  function normalizeAssetPath(p) {
-    if (!p) return [];
-    let norm = String(p).trim();
+  function normalizeAssetPath(p){
+    if(!p) return p;
+    // Keep absolute URLs untouched
+    if(/^https?:\/\//i.test(p)) return p;
+    // Already root-based
+    if(p.startsWith('/')) return p;
 
-    // Common inputs: "assets/...", "/assets/...", "./assets/..."
-    norm = norm.replace(/^\.\//, "");
-    if (norm.startsWith("assets/")) norm = "/" + norm;
-    if (!norm.startsWith("/")) norm = "/" + norm;
+    // Common cases in this project
+    if(p.startsWith('./')) p = p.slice(2);
+    if(p.startsWith('v2/')) p = p.slice(3);          // "v2/assets/..." -> "assets/..."
+    if(p.startsWith('public/')) p = p.slice(7);      // "public/assets/..." -> "assets/..."
 
-    // If someone accidentally stored /v2/assets/..., prefer root /assets/...
-    if (norm.startsWith("/v2/assets/")) {
-      return [norm.replace(/^\/v2/, ""), norm];
-    }
+    if(p.startsWith('assets/')) return '/' + p;
+
+    // Fallback: treat as root-relative
+    return '/' + p;
+  }
 
     return [norm];
   }
@@ -37,8 +41,10 @@
     return urls[0] || "";
   }
 
-  async function resolveAsset(p) {
-    return await pickFirstAvailable(assetCandidates(p));
+  async function resolveAsset(p){
+    // We keep this async so older callers don't break.
+    // In practice we just normalize the path to a root-based /assets/... URL.
+    return normalizeAssetPath(p);
   }
 
   function parseTimeToSeconds(t) {
@@ -173,10 +179,25 @@
   function showEmojiTray(on){
     const tray = document.getElementById('emojiTray') || document.querySelector('.emoji-tray');
     if(!tray) return;
-    tray.classList.toggle('active', !!on);
-    // Some layouts also hide via inline styles / .hidden
-    tray.classList.remove('hidden');
-    if (on) tray.style.display = '';
+
+    if(on){
+      // Make sure it is visible and ABOVE the whiteboard overlay
+      if(tray.dataset.prevZ === undefined) tray.dataset.prevZ = tray.style.zIndex || '';
+      tray.style.zIndex = '90';
+      tray.style.pointerEvents = 'auto';
+      tray.style.display = '';
+      tray.classList.remove('hidden');
+      tray.classList.add('active');
+      tray.setAttribute('aria-hidden','false');
+    } else {
+      tray.classList.remove('active');
+      tray.setAttribute('aria-hidden','true');
+      // Restore prior z-index (if any)
+      if(tray.dataset.prevZ !== undefined){
+        tray.style.zIndex = tray.dataset.prevZ;
+        delete tray.dataset.prevZ;
+      }
+    }
   }
 
   function buildBoard(boardSrc){
