@@ -8,14 +8,92 @@
 
   // Normalize asset paths so they work even when this file is served from /v2/
   function normalizeAssetPath(p) {
-    if (!p) return p;
-    // absolute URL
+    if (!p) return "";
+    // allow passing full URLs
     if (/^https?:\/\//i.test(p)) return p;
-    // already absolute to site root
-    if (p.startsWith('/')) return p;
-    // common case: 'assets/...' should be '/assets/...'
-    if (p.startsWith('assets/')) return '/' + p;
-    return p; // leave relative paths as-is
+    // keep absolute paths absolute
+    if (p.startsWith("/")) return p;
+    return "/" + p.replace(/^\.?\//, "");
+  }
+
+  // When running under /v2/ on Vercel, some assets may be reachable both at:
+  //   /assets/...   (recommended)
+  // and sometimes at:
+  //   /v2/assets/... (if the site is nested)
+  // We try a small list of candidates and pick the first that exists.
+  function assetCandidates(p) {
+    const norm = normalizeAssetPath(p);
+    if (!norm) return [];
+    const list = [norm];
+
+    // If we're currently under /v2/ and the path is /assets/..., also try /v2/assets/...
+    if (location.pathname.startsWith("/v2/") && norm.startsWith("/assets/")) {
+      list.push("/v2" + norm);
+    }
+
+    // If the path is /v2/assets/... but we're not under /v2/, also try /assets/...
+    if (!location.pathname.startsWith("/v2/") && norm.startsWith("/v2/assets/")) {
+      list.push(norm.replace(/^\/v2/, ""));
+    }
+
+    // De-dupe
+    return Array.from(new Set(list));
+  }
+
+  async function pickFirstAvailable(urls) {
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { method: "HEAD" });
+        if (res.ok) return url;
+      } catch {
+        // ignore and try next
+      }
+    }
+    // If HEAD is blocked or fails, still return the first so we at least attempt to load.
+    return urls[0] || "";
+  }
+
+  async function resolveAsset(p) {
+    return await pickFirstAvailable(assetCandidates(p));
+  }
+
+  function parseTimeToSeconds(t) {
+    if (t == null) return 0;
+    if (typeof t === "number" && isFinite(t)) return t;
+    if (typeof t !== "string") return 0;
+
+    const s = t.trim();
+    // "12.34" or "12,34"
+    if (/^\d+([.,]\d+)?$/.test(s)) return parseFloat(s.replace(",", "."));
+
+    const parts = s.split(":").map((x) => x.trim());
+    // mm:ss:cc  (centiseconds)
+    if (parts.length === 3) {
+      const mm = parseInt(parts[0] || "0", 10) || 0;
+      const ss = parseInt(parts[1] || "0", 10) || 0;
+      const cc = parseInt(parts[2] || "0", 10) || 0;
+      return mm * 60 + ss + cc / 100;
+    }
+    // mm:ss
+    if (parts.length === 2) {
+      const mm = parseInt(parts[0] || "0", 10) || 0;
+      const ss = parseInt(parts[1] || "0", 10) || 0;
+      return mm * 60 + ss;
+    }
+    return 0;
+  }
+
+  function normalizeSongCues(raw) {
+    const cues = Array.isArray(raw) ? raw : [];
+    return cues
+      .map((c) => {
+        const word = c.word ?? c.text ?? c.value ?? c.label ?? "";
+        const start = parseTimeToSeconds(c.start ?? c.from ?? c.startTime ?? 0);
+        const end = parseTimeToSeconds(c.end ?? c.to ?? c.endTime ?? 0);
+        return { word: String(word), start, end };
+      })
+      .filter((c) => c.word && isFinite(c.start) && isFinite(c.end) && c.end > c.start)
+      .sort((a, b) => a.start - b.start);
   }
 
   // Temporarily raise the emoji tray above overlays during the song mini-game
@@ -170,7 +248,10 @@
   async function songChallenge(interaction){
     const ui=buildBoard(normalizeAssetPath(interaction.board||'assets/ui/magic-board.png'));
 
-    const song=new Audio(normalizeAssetPath(interaction.song||''));
+    const song = new Audio();
+    song.preload = \"auto\";
+    song.src = await resolveAsset(interaction.song||'');
+    
     song.preload='auto';
 
     const yay=interaction.feedback?.praiseSound ? new Audio(normalizeAssetPath(interaction.feedback.praiseSound)) : null;
@@ -326,7 +407,12 @@
       await unlockAudio();
       try{
         song.currentTime = 0;
-        await song.play();
+        try {
+      await song.play();
+    } catch (e) {
+      // If the song file can't play/load, we still run the timing loop so UI works.
+      console.warn("Song playback failed, continuing without audio:", e);
+    }
         started = true;
       }catch{
         started = false;
@@ -395,7 +481,7 @@
     let raf=0;
     function tick(){
       progress();
-      const t=song.currentTime||0;
+      const t = (song && isFinite(song.currentTime) ? song.currentTime : 0) || 0;
       const f=findCue(t);
       if(f){
         if(f.i!==activeIndex){
