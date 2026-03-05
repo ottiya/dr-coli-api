@@ -208,8 +208,7 @@
       "drColi": {
         "animation": "talk",
         "say": [
-          "Alright friends. Let’s put it together now.",
-          "Bori is almost ready.",
+          "Alright, {name}. Let’s put it together now.",
           "How do we say hello to a teacher in Korean?",
           "We say 안녕하세요 선생님!"
         ]
