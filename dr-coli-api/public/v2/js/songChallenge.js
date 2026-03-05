@@ -102,13 +102,19 @@
 
 
   function existingEmojiButtons(){
-    const btns=Array.from(document.querySelectorAll('.emoji-slot'));
+    // Prefer buttons inside the emoji tray if present
+    const root = document.getElementById('emojiTray') || document.querySelector('.emoji-tray') || document;
+    const btns=Array.from(root.querySelectorAll('.emoji-slot'));
     return btns.length>=3?btns.slice(0,3):null;
   }
 
   function showEmojiTray(on){
-    const tray=document.querySelector('.emoji-tray');
-    if(tray) tray.classList.toggle('active', !!on);
+    const tray = document.getElementById('emojiTray') || document.querySelector('.emoji-tray');
+    if(!tray) return;
+    tray.classList.toggle('active', !!on);
+    // Some layouts also hide via inline styles / .hidden
+    tray.classList.remove('hidden');
+    if (on) tray.style.display = '';
   }
 
   function buildBoard(boardSrc){
@@ -189,13 +195,11 @@
     // Hook to existing tray buttons
     let btns=existingEmojiButtons();
     if(btns){
-      showEmojiTray(true);
-    elevateEmojiTray(true);
       btns[0].textContent=choices[0];
       btns[1].textContent=choices[1];
       btns[2].textContent=choices[2];
     } else {
-      // If you ever run without the PNG tray, you can add a fallback later
+      // If the emoji tray isn't in the DOM for some reason, fail gracefully
       btns=[];
     }
 
@@ -313,18 +317,79 @@
       b.addEventListener('click', h);
     });
 
-    // Start song (with fallback tap prompt)
-    await unlockAudio();
-    try{
-      song.currentTime=0;
-      await song.play();
-    }catch{
-      ui.cue.style.opacity='1';
-      ui.cue.style.fontSize='28px';
-      ui.cue.textContent='Tap to start the song 🔊';
-      ui.overlay.addEventListener('click', async ()=>{
-        try{ await unlockAudio(); ui.cue.style.opacity='0'; await song.play(); }catch{}
+    // Start song (iOS Safari requires a *direct* user gesture). We therefore:
+    // 1) attempt autoplay
+    // 2) if it fails, show a big "Start Song" button and wait for tap
+    let started = false;
+    async function beginPlayback(){
+      if (started) return;
+      await unlockAudio();
+      try{
+        song.currentTime = 0;
+        await song.play();
+        started = true;
+      }catch{
+        started = false;
+      }
+      if (started) {
+        // Show tray only once audio is actually running
+        if (btns.length) {
+          showEmojiTray(true);
+          elevateEmojiTray(true);
+        }
+      }
+      return started;
+    }
+
+    // Try to start immediately
+    await beginPlayback();
+
+    // If blocked, show in-board start button (stronger gesture signal than clicking the background)
+    let startBtn = null;
+    if (!started) {
+      setCueText('Ready? Tap Start Song! 🔊', false);
+      ui.cue.style.fontSize = '34px';
+      startBtn = el('button', {
+        style: {
+          position: 'absolute',
+          bottom: '18%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '14px 22px',
+          borderRadius: '16px',
+          background: '#ffd84d',
+          color: '#2b2b2b',
+          fontFamily: 'Nunito, system-ui, sans-serif',
+          fontWeight: '900',
+          fontSize: '22px',
+          cursor: 'pointer',
+          boxShadow: '0 10px 20px rgba(0,0,0,.20)'
+        }
+      }, ['Start Song']);
+      ui.wrap.appendChild(startBtn);
+
+      await new Promise((resolve)=>{
+        startBtn.addEventListener('click', async ()=>{
+          startBtn.disabled = true;
+          const ok = await beginPlayback();
+          if (ok) {
+            try { startBtn.remove(); } catch {}
+            setCueText('', false);
+          } else {
+            startBtn.disabled = false;
+            setCueText('Tap Start Song again 🔊', false);
+          }
+          resolve();
+        }, {once:false});
       });
+    }
+
+    // If we still didn't start, bail gracefully (no audio means no game)
+    if (!started) {
+      elevateEmojiTray(false);
+      showEmojiTray(false);
+      ui.destroy();
+      return { action: 'continue', reason: 'audio_blocked' };
     }
 
     let raf=0;
