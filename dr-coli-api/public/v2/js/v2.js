@@ -751,6 +751,34 @@ async function playDialogue(lines, done) {
     if (type === "emoji") return showEmojiInteraction(interaction);
     if (type === "mic") return showMicInteraction(interaction);
 
+    // Song mini-game (Episode 1 end)
+    if (type === "songReady") {
+      if (!window.SongChallenge?.songReady) {
+        console.warn('SongChallenge module not loaded');
+        return autoAdvance();
+      }
+      window.SongChallenge.songReady(interaction).then(() => {
+        playScene(currentSceneIndex + 1);
+      });
+      return;
+    }
+
+    if (type === "songChallenge") {
+      if (!window.SongChallenge?.songChallenge) {
+        console.warn('SongChallenge module not loaded');
+        return autoAdvance();
+      }
+      window.SongChallenge.songChallenge(interaction).then((result) => {
+        // result.action is 'replay' or 'continue'
+        if (result?.action === 'replay') {
+          playScene(currentSceneIndex);
+        } else {
+          playScene(currentSceneIndex + 1);
+        }
+      });
+      return;
+    }
+
     autoAdvance();
   }
 
@@ -1187,7 +1215,61 @@ async function recordOnce({ ms = 2600 } = {}) {
     await setBori(prevBori).catch(() => {});
   }
 
-  function spawnFullScreenConfetti() {
+  
+
+  // Small burst confetti (used by SongChallenge)
+  // Note: SongChallenge passes page (client) coordinates.
+  window.confettiBurst = function confettiBurst(clientX, clientY, count = 12) {
+    try {
+      if (!fxLayerEl) return;
+      const rect = fxLayerEl.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const N = Math.max(1, Math.min(60, count | 0));
+      const scale = 0.2;
+
+      for (let i = 0; i < N; i++) {
+        const img = document.createElement("img");
+        img.src = CONFETTI_IMAGES[(Math.random() * CONFETTI_IMAGES.length) | 0];
+        img.alt = "";
+        img.style.position = "absolute";
+        img.style.left = x + "px";
+        img.style.top = y + "px";
+        img.style.width = 120 * scale + "px";
+        img.style.height = "auto";
+        img.style.transform = "translate(-50%, -50%)";
+        img.style.pointerEvents = "none";
+        img.style.zIndex = "90";
+        fxLayerEl.appendChild(img);
+
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 80 + Math.random() * 140;
+        const dx = Math.cos(angle) * dist;
+        const dy = Math.sin(angle) * dist;
+        const rot = (Math.random() * 720 - 360).toFixed(1);
+
+        const anim = img.animate(
+          [
+            { transform: "translate(-50%, -50%) translate(0px, 0px) rotate(0deg)", opacity: 1 },
+            { transform: `translate(-50%, -50%) translate(${dx}px, ${dy}px) rotate(${rot}deg)`, opacity: 0 }
+          ],
+          { duration: 700, easing: "ease-out", fill: "forwards" }
+        );
+
+        anim.onfinish = () => {
+          try { img.remove(); } catch {}
+        };
+
+        // safety cleanup
+        setTimeout(() => { try { img.remove(); } catch {} }, 900);
+      }
+    } catch (e) {
+      // non-fatal
+      console.warn('confettiBurst failed', e);
+    }
+  };
+
+function spawnFullScreenConfetti() {
     const N = 60;
     const w = fxLayerEl.clientWidth || window.innerWidth;
     const h = fxLayerEl.clientHeight || window.innerHeight;
