@@ -243,8 +243,8 @@
         "prompt": "Tap the mic, then say 안녕하세요 선생님!",
         "strictness": "easy",
         "onSuccessSay": [
-          "Bori is ready to greet 선생님!",
-          "Wonderful, {name}! You earned all the stars!"
+          "Thanks to you, {name}, Bori can greet 선생님!",
+          "Wonderful! You earned all the stars!"
         ],
         "onFailSay": [
           "So close! Let’s try together one more time."
