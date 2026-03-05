@@ -329,31 +329,6 @@ function awardStar(sceneId) {
     playScene(0);
   }
 
-  // ===== DEV: allow skipping straight to the song challenge (s11) =====
-window.skipToSongChallenge = function () {
-try {
-if (!episode || !episode.scenes) {
-console.warn("Episode not loaded yet.");
-return;
-}
-
-const idx = episode.scenes.findIndex(s => s.id === "s11-song-challenge");
-if (idx === -1) {
-console.warn("Scene s11-song-challenge not found.");
-return;
-}
-
-// Optional: hide start screen if it's still up
-const startScreen = document.getElementById("startScreen");
-if (startScreen) startScreen.classList.add("hidden");
-
-playScene(idx);
-} catch (e) {
-console.error("skipToSongChallenge failed:", e);
-}
-};
-  
-
   function normalizeManifest(man) {
     const out = { drColi: null, bori: null };
 
