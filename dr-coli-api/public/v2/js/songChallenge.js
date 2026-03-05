@@ -6,6 +6,32 @@
      if (scene.interaction.type==='songChallenge') await SongChallenge.songChallenge(scene.interaction);
 */
 
+  // Normalize asset paths so they work even when this file is served from /v2/
+  function normalizeAssetPath(p) {
+    if (!p) return p;
+    // absolute URL
+    if (/^https?:\/\//i.test(p)) return p;
+    // already absolute to site root
+    if (p.startsWith('/')) return p;
+    // common case: 'assets/...' should be '/assets/...'
+    if (p.startsWith('assets/')) return '/' + p;
+    return p; // leave relative paths as-is
+  }
+
+  // Temporarily raise the emoji tray above overlays during the song mini-game
+  let __trayPrevZ = null;
+  function elevateEmojiTray(on) {
+    const tray = document.getElementById('emojiTray');
+    if (!tray) return;
+    if (on) {
+      if (__trayPrevZ === null) __trayPrevZ = tray.style.zIndex || '';
+      tray.style.zIndex = '80';
+    } else {
+      if (__trayPrevZ !== null) tray.style.zIndex = __trayPrevZ;
+      __trayPrevZ = null;
+    }
+  }
+
 (function(){
   'use strict';
 
@@ -86,8 +112,8 @@
   }
 
   function buildBoard(boardSrc){
-    const overlay=el('div',{class:'song-overlay',style:{position:'absolute',inset:'0',display:'grid',placeItems:'center',zIndex:54,pointerEvents:'auto'}});
-    const wrap=el('div',{style:{width:'min(900px, calc(100% - 32px))',aspectRatio:'1100/650',position:'relative',display:'grid',placeItems:'center',filter:'drop-shadow(0 18px 35px rgba(0,0,0,.35))'}});
+    const overlay=el('div',{class:'song-overlay',style:{position:'absolute',inset:'0',display:'grid',placeItems:'center',zIndex:54,pointerEvents:'none'}});
+    const wrap=el('div',{style:{width:'min(900px, calc(100% - 32px))',aspectRatio:'1100/650',position:'relative',display:'grid',placeItems:'center',filter:'drop-shadow(0 18px 35px rgba(0,0,0,.35))',pointerEvents:'auto'}});
     const img=el('img',{src:boardSrc,alt:'Magic board',style:{width:'100%',height:'100%',display:'block',borderRadius:'24px',pointerEvents:'none',userSelect:'none'}});
     const cue=el('div',{style:{position:'absolute',top:'38%',left:'50%',transform:'translate(-50%,-50%)',fontFamily:'Nunito, system-ui, sans-serif',fontWeight:'900',fontSize:'64px',color:'#2b2b2b',opacity:'0',transition:'opacity 160ms ease',whiteSpace:'nowrap',userSelect:'none'}});
     const fb=el('div',{style:{position:'absolute',top:'62%',left:'50%',transform:'translate(-50%,-50%)',fontFamily:'Nunito, system-ui, sans-serif',fontWeight:'900',fontSize:'34px',color:'#2b2b2b',opacity:'0',transition:'opacity 140ms ease',userSelect:'none'}});
@@ -108,7 +134,7 @@
   }
 
   async function songReady(interaction){
-    const ui=buildBoard(interaction.board||'assets/ui/magic-board.png');
+    const ui=buildBoard(normalizeAssetPath(interaction.board||'assets/ui/magic-board.png'));
     ui.cue.style.opacity='1';
     ui.cue.style.fontSize='44px';
     ui.cue.textContent=personalize('Ready? Press Play!');
@@ -119,6 +145,7 @@
     // show tray if you have it
     const btns=existingEmojiButtons();
     if(btns) showEmojiTray(true);
+    elevateEmojiTray(true);
 
     setChars('idle','idle');
 
@@ -126,6 +153,8 @@
       btn.addEventListener('click', async ()=>{
         btn.disabled=true;
         await unlockAudio();
+    elevateEmojiTray(false);
+    showEmojiTray(false);
         ui.destroy();
         resolve({action:'play'});
       }, {once:true});
@@ -133,13 +162,13 @@
   }
 
   async function songChallenge(interaction){
-    const ui=buildBoard(interaction.board||'assets/ui/magic-board.png');
+    const ui=buildBoard(normalizeAssetPath(interaction.board||'assets/ui/magic-board.png'));
 
-    const song=new Audio(interaction.song||'');
+    const song=new Audio(normalizeAssetPath(interaction.song||''));
     song.preload='auto';
 
-    const yay=interaction.feedback?.praiseSound ? new Audio(interaction.feedback.praiseSound) : null;
-    const oops=interaction.feedback?.oopsSound ? new Audio(interaction.feedback.oopsSound) : null;
+    const yay=interaction.feedback?.praiseSound ? new Audio(normalizeAssetPath(interaction.feedback.praiseSound)) : null;
+    const oops=interaction.feedback?.oopsSound ? new Audio(normalizeAssetPath(interaction.feedback.oopsSound)) : null;
     if(yay) yay.preload='auto';
     if(oops) oops.preload='auto';
 
@@ -161,6 +190,7 @@
     let btns=existingEmojiButtons();
     if(btns){
       showEmojiTray(true);
+    elevateEmojiTray(true);
       btns[0].textContent=choices[0];
       btns[1].textContent=choices[1];
       btns[2].textContent=choices[2];
@@ -334,6 +364,8 @@
 
     // cleanup
     bound.forEach(([b,h])=>b.removeEventListener('click',h));
+    elevateEmojiTray(false);
+    showEmojiTray(false);
     ui.destroy();
 
     return endResult;
