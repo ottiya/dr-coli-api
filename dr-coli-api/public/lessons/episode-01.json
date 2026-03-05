@@ -13,10 +13,13 @@
           "You can also call me Coli 선생님."
         ]
       },
-      "bori": { "animation": "look" },
-      "interaction": { "type": "none" }
+      "bori": {
+        "animation": "look"
+      },
+      "interaction": {
+        "type": "none"
+      }
     },
-
     {
       "id": "s1-teach-seonsaengnim",
       "drColi": {
@@ -29,20 +32,27 @@
           "Can you try to say 선생님 with me?"
         ]
       },
-      "bori": { "animation": "look" },
+      "bori": {
+        "animation": "look"
+      },
       "interaction": {
         "type": "mic",
-        "targets": ["선생님", "선생님이에요", "선생님 입니다"],
+        "targets": [
+          "선생님",
+          "선생님이에요",
+          "선생님 입니다"
+        ],
         "prompt": "Tap the mic, then say 선생님!",
         "strictness": "easy",
         "onSuccessSay": [
           "Wonderful {name}!",
           "Excellent! That’s one star!"
         ],
-        "onFailSay": ["So close! Let’s try together one more time."]
+        "onFailSay": [
+          "So close! Let’s try together one more time."
+        ]
       }
     },
-
     {
       "id": "s2-meet-bori",
       "drColi": {
@@ -51,10 +61,13 @@
           "Bori and I are so happy you’re here, {name}!"
         ]
       },
-      "bori": { "animation": "wave" },
-      "interaction": { "type": "none" }
+      "bori": {
+        "animation": "wave"
+      },
+      "interaction": {
+        "type": "none"
+      }
     },
-
     {
       "id": "s3a-intro-annyonghaseyo",
       "drColi": {
@@ -64,20 +77,28 @@
           "In Korean, when we meet adults, we say: 안녕하세요."
         ]
       },
-      "bori": { "animation": "idle" },
-      "interaction": { "type": "none" }
+      "bori": {
+        "animation": "idle"
+      },
+      "interaction": {
+        "type": "none"
+      }
     },
-
     {
       "id": "s3b-bow-like-this",
       "drColi": {
         "animation": "talk",
-        "say": ["When we say 안녕하세요, we do a little bow. Like this!"]
+        "say": [
+          "When we say 안녕하세요, we do a little bow. Like this!"
+        ]
       },
-      "bori": { "animation": "bow" },
-      "interaction": { "type": "none" }
+      "bori": {
+        "animation": "bow"
+      },
+      "interaction": {
+        "type": "none"
+      }
     },
-
     {
       "id": "s4-repeat-annyonghaseyo",
       "drColi": {
@@ -87,20 +108,27 @@
           "Ready? 안녕하세요!"
         ]
       },
-      "bori": { "animation": "bow" },
+      "bori": {
+        "animation": "bow"
+      },
       "interaction": {
         "type": "mic",
-        "targets": ["안녕하세요", "안녕하세이요", "안녕하세요 선생님"],
+        "targets": [
+          "안녕하세요",
+          "안녕하세이요",
+          "안녕하세요 선생님"
+        ],
         "prompt": "Tap the mic, then say 안녕하세요!",
         "strictness": "easy",
         "onSuccessSay": [
           "Great job, {name}!",
           "That’s another star!"
         ],
-        "onFailSay": ["So close! Let’s try together one more time."]
+        "onFailSay": [
+          "So close! Let’s try together one more time."
+        ]
       }
     },
-
     {
       "id": "s5-emoji-check-annyonghaseyo",
       "drColi": {
@@ -110,19 +138,26 @@
           "When we say 안녕하세요, what do we do?"
         ]
       },
-      "bori": { "animation": "look" },
+      "bori": {
+        "animation": "look"
+      },
       "interaction": {
         "type": "emoji",
-        "choices": ["🙇‍♀️", "👋", "🏃‍♀️"],
+        "choices": [
+          "🙇‍♀️",
+          "👋",
+          "🏃‍♀️"
+        ],
         "correctIndex": 0,
         "onCorrectSay": [
           "Yes! We bow when we say 안녕하세요!",
           "Excellent, {name}! That’s one more star!"
         ],
-        "onWrongSay": ["Nice try! Let’s try again."]
+        "onWrongSay": [
+          "Nice try! Let’s try again."
+        ]
       }
     },
-
     {
       "id": "s6-intro-annyeong",
       "drColi": {
@@ -133,10 +168,13 @@
           "And when we say 안녕, we wave!"
         ]
       },
-      "bori": { "animation": "wave" },
-      "interaction": { "type": "none" }
+      "bori": {
+        "animation": "wave"
+      },
+      "interaction": {
+        "type": "none"
+      }
     },
-
     {
       "id": "s7-emoji-check-annyeong",
       "drColi": {
@@ -145,19 +183,26 @@
           "{name}, when we say 안녕, what do we do?"
         ]
       },
-      "bori": { "animation": "look" },
+      "bori": {
+        "animation": "look"
+      },
       "interaction": {
         "type": "emoji",
-        "choices": ["🙇‍♀️", "👋", "🏃‍♀️"],
+        "choices": [
+          "🙇‍♀️",
+          "👋",
+          "🏃‍♀️"
+        ],
         "correctIndex": 1,
         "onCorrectSay": [
           "Yes, {name}! We wave when we say 안녕!",
           "Wonderful! Another star!"
         ],
-        "onWrongSay": ["Nice try! Let’s try again."]
+        "onWrongSay": [
+          "Nice try! Let’s try again."
+        ]
       }
     },
-
     {
       "id": "s8-hello-seonsaengnim",
       "drColi": {
@@ -169,10 +214,13 @@
           "We say 안녕하세요 선생님!"
         ]
       },
-      "bori": { "animation": "idle" },
-      "interaction": { "type": "none" }
+      "bori": {
+        "animation": "idle"
+      },
+      "interaction": {
+        "type": "none"
+      }
     },
-
     {
       "id": "s9-repeat-annyeonghaseyo-seonsaengnim",
       "drColi": {
@@ -182,17 +230,162 @@
           "Ready to help Bori say hello to 선생님?"
         ]
       },
-      "bori": { "animation": "bow" },
+      "bori": {
+        "animation": "bow"
+      },
       "interaction": {
         "type": "mic",
-        "targets": ["안녕하세요 선생님", "안녕하세요", "안녕하세이요"],
+        "targets": [
+          "안녕하세요 선생님",
+          "안녕하세요",
+          "안녕하세이요"
+        ],
         "prompt": "Tap the mic, then say 안녕하세요 선생님!",
         "strictness": "easy",
         "onSuccessSay": [
           "Bori is ready to greet 선생님!",
           "Wonderful, {name}! You earned all the stars!"
         ],
-        "onFailSay": ["So close! Let’s try together one more time."]
+        "onFailSay": [
+          "So close! Let’s try together one more time."
+        ]
+      }
+    },
+    {
+      "id": "s10-song-intro",
+      "drColi": {
+        "animation": "talk",
+        "say": [
+          "Alright {name}, let's play a game!",
+          "When you hear 안녕하세요, tap bow 🙇.",
+          "When you hear 안녕, tap wave 👋.",
+          "Ready? Press Play!"
+        ]
+      },
+      "bori": {
+        "animation": "idle"
+      },
+      "interaction": {
+        "type": "songReady",
+        "board": "assets/ui/magic-board.png",
+        "playButtonText": "Play!"
+      }
+    },
+    {
+      "id": "s11-song-challenge",
+      "drColi": {
+        "animation": "idle",
+        "say": []
+      },
+      "bori": {
+        "animation": "idle"
+      },
+      "interaction": {
+        "type": "songChallenge",
+        "board": "assets/ui/magic-board.png",
+        "song": "assets/songs/Song1_안녕하세요_35secver.mp3",
+        "choices": [
+          "🙇‍♀️",
+          "👋",
+          "🏃‍♀️"
+        ],
+        "firstTapOnly": true,
+        "cues": [
+          {
+            "word": "안녕",
+            "start": 0.0,
+            "end": 2.15,
+            "correctIndex": 1
+          },
+          {
+            "word": "안녕",
+            "start": 2.16,
+            "end": 6.03,
+            "correctIndex": 1
+          },
+          {
+            "word": "안녕하세요",
+            "start": 6.04,
+            "end": 10.1,
+            "correctIndex": 0
+          },
+          {
+            "word": "안녕",
+            "start": 10.11,
+            "end": 13.0,
+            "correctIndex": 1
+          },
+          {
+            "word": "안녕",
+            "start": 13.1,
+            "end": 16.5,
+            "correctIndex": 1
+          },
+          {
+            "word": "안녕하세요",
+            "start": 16.51,
+            "end": 20.04,
+            "correctIndex": 0
+          },
+          {
+            "word": "안녕",
+            "start": 20.05,
+            "end": 21.14,
+            "correctIndex": 1
+          },
+          {
+            "word": "안녕하세요",
+            "start": 27.0,
+            "end": 31.15,
+            "correctIndex": 0
+          },
+          {
+            "word": "안녕",
+            "start": 31.16,
+            "end": 34.12,
+            "correctIndex": 1
+          }
+        ],
+        "feedback": {
+          "praiseTexts": [
+            "Yay!",
+            "Great!",
+            "You got it!",
+            "Amazing, {name}!"
+          ],
+          "praiseSound": "assets/sound-effects/kids-yay.wav",
+          "oopsText": "oops!",
+          "oopsSound": "assets/sound-effects/incorrect-sound-effect_oops.wav",
+          "lockedText": "✅ Locked in!",
+          "streakText": "✨ streak!",
+          "streakAt": 3
+        },
+        "endScreen": {
+          "tiers": [
+            {
+              "minAccuracy": 0.9,
+              "stars": 5,
+              "message": "{name}! You're a SUPER STAR!"
+            },
+            {
+              "minAccuracy": 0.7,
+              "stars": 4,
+              "message": "{name}! Excellent!"
+            },
+            {
+              "minAccuracy": 0.5,
+              "stars": 3,
+              "message": "{name}! Good job!"
+            },
+            {
+              "minAccuracy": 0.0,
+              "stars": 2,
+              "message": "Nice try, {name}!"
+            }
+          ],
+          "replayText": "Replay Song Challenge",
+          "continueText": "Continue"
+        }
       }
     }
   ]
